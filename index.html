@@ -25,8 +25,12 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 #addNameBtn{background:transparent;border:1px dashed #444;color:#888;padding:.4rem 1rem;border-radius:6px;cursor:pointer;font-size:.85rem}
 #addNameBtn:hover{border-color:#e94560;color:#e94560}
 button{font-family:inherit}
-#generateBtn{background:#e94560;color:#fff;border:none;padding:.8rem 2rem;border-radius:8px;font-size:1.05rem;cursor:pointer;margin-bottom:1.5rem;transition:background .2s}
+.btn-row{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem}
+#generateBtn{background:#e94560;color:#fff;border:none;padding:.8rem 2rem;border-radius:8px;font-size:1.05rem;cursor:pointer;transition:background .2s}
 #generateBtn:hover{background:#c81e45}
+#aiGenerateBtn{background:transparent;border:1px solid #e94560;color:#e94560;padding:.8rem 1.5rem;border-radius:8px;font-size:1.05rem;cursor:pointer;transition:all .2s}
+#aiGenerateBtn:hover{background:#e94560;color:#fff}
+#aiGenerateBtn:disabled{opacity:.5;cursor:not-allowed;border-color:#444;color:#666}
 .quote-box{background:#0f0f23;border:1px solid #333;border-radius:10px;padding:1.5rem;min-height:100px;text-align:left;white-space:pre-wrap;line-height:1.6;font-size:1.05rem}
 .placeholder-text{color:#555;text-align:center}
 .quote-line{margin-bottom:.5rem}
@@ -65,6 +69,12 @@ button{font-family:inherit}
 .save-result{font-size:.8rem;margin-top:.3rem}
 .save-result.ok{color:#4caf50}
 .save-result.err{color:#e94560}
+.ai-source-badge{display:inline-block;font-size:.7rem;background:#673ab7;color:#fff;padding:.1rem .5rem;border-radius:4px;margin-left:.3rem;vertical-align:middle}
+.ai-publish-btn{background:#4caf50;color:#fff;border:none;padding:.5rem 1.5rem;border-radius:6px;cursor:pointer;margin-top:1rem;font-size:.9rem}
+.ai-publish-btn:hover{background:#388e3c}
+.ai-provider-select{margin-bottom:.5rem}
+.ai-provider-select label{display:block;margin-bottom:.3rem;font-size:.85rem;color:#aaa}
+.ai-provider-select select{cursor:pointer}
 </style>
 </head>
 <body>
@@ -88,13 +98,17 @@ button{font-family:inherit}
 
 <div id="nameFields" class="name-fields"></div>
 
-<button id="generateBtn" onclick="generateQuote()">Сгенерировать цитату</button>
+<div class="btn-row">
+<button id="generateBtn" onclick="generateQuote()">Сгенерировать</button>
+<button id="aiGenerateBtn" onclick="generateWithAI()">✨ Сгенерировать через ИИ</button>
+</div>
 
 <div id="quoteBox" class="quote-box">
 <p class="placeholder-text">Нажмите «Сгенерировать», чтобы получить цитату</p>
 </div>
 
 <button class="copy-btn hidden" id="copyBtn" onclick="copyQuote()">Скопировать</button>
+<button class="ai-publish-btn hidden" id="aiPublishBtn" onclick="publishAIQuote()">Опубликовать эту цитату</button>
 
 <!-- Панель входа админа -->
 <div id="adminLoginPanel" class="admin-panel admin-login hidden">
@@ -109,19 +123,34 @@ button{font-family:inherit}
 <div id="adminPanel" class="admin-panel hidden">
 <h2>Управление цитатами <span class="badge">admin</span></h2>
 
-<!-- Настройка токена GitHub -->
+<!-- Токен GitHub -->
 <div class="token-section">
 <label for="githubToken">Токен GitHub API (fine-grained):</label>
 <input type="password" id="githubToken" placeholder="github_pat_..." onkeydown="if(event.key==='Enter')saveToken()" />
 <button class="form-btn" onclick="saveToken()">Сохранить токен</button>
 <p class="token-status" id="tokenStatus"></p>
-<p class="admin-info">Токен хранится только в вашем браузере (localStorage) и не попадает в исходный код.<br>
-Создайте fine-grained token с правом <strong>Contents: Read and write</strong> для этого репозитория.<br>
-Настройки GitHub → Developer settings → Personal access tokens → Fine-grained tokens.</p>
+<p class="admin-info">Для публикации цитат в репозиторий. Права: Contents: Read and write.</p>
+</div>
+
+<!-- Настройка ИИ -->
+<div class="token-section">
+<div class="ai-provider-select">
+<label for="aiProvider">Провайдер ИИ:</label>
+<select id="aiProvider" onchange="onProviderChange()">
+<option value="groq">Groq (бесплатно, без Google) — Llama, DeepSeek</option>
+<option value="openrouter">OpenRouter (бесплатные модели) — Llama, Gemma, Qwen</option>
+<option value="mistral">Mistral AI (бесплатно) — Mistral, Ministral</option>
+</select>
+</div>
+<label for="aiKey">Ключ API:</label>
+<input type="password" id="aiKey" placeholder="Вставьте ключ..." onkeydown="if(event.key==='Enter')saveAIKey()" />
+<button class="form-btn" onclick="saveAIKey()">Сохранить ключ</button>
+<p class="token-status" id="aiKeyStatus"></p>
+<div class="ai-provider-info" id="aiProviderInfo"></div>
 </div>
 
 <div class="add-quote-form">
-<label style="display:block;margin-bottom:.3rem;font-size:.9rem;color:#aaa">Новая цитата:</label>
+<label style="display:block;margin-bottom:.3rem;font-size:.9rem;color:#aaa">Новая цитата вручную:</label>
 <textarea id="newQuoteText" placeholder='{1}: Что делаешь?&#10;{2}: Совершаю ошибку, но с уверенностью.&#10;&#10;Используйте {1}, {2}, {3} для имён.&#10;Для гендерных вариантов: {2?сделал|сделала}&#10;Перенос строки — Enter.'></textarea>
 <button class="form-btn" onclick="addQuoteToRepo()">Опубликовать цитату</button>
 <p class="save-result" id="saveResult"></p>
@@ -129,7 +158,6 @@ button{font-family:inherit}
 <b>Синтаксис:</b><br>
 <code>{1}</code>, <code>{2}</code> — имена персонажей по порядку.<br>
 <code>{2?сделал|сделала}</code> — гендерный вариант: мужской|женский.<br>
-«Опубликовать» — добавляет цитату в репозиторий, она станет видна всем посетителям.
 </div>
 </div>
 
@@ -141,17 +169,44 @@ button{font-family:inherit}
 
 <script>
 // ============================================================
-//  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ — версия с записью в GitHub
+//  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ — с ИИ (Groq / OpenRouter / Mistral)
 // ============================================================
 
 // ---- НАСТРОЙКИ ----
 const ADMIN_PASSWORD = 'grim17';
+const GITHUB_OWNER = 'SphinssaCat';
+const GITHUB_REPO = 'Incorrect_quotes_forfun';
+const GITHUB_BRANCH = 'main';
+const QUOTES_FILE = 'quotes.json';
 
-// Данные репозитория — ЗАМЕНИТЕ НА СВОИ
-const GITHUB_OWNER = 'SphinssaCat';       // ← ваш логин GitHub
-const GITHUB_REPO = 'Incorrect_quotes_forfun'; // ← имя репозитория
-const GITHUB_BRANCH = 'main';           // ← ветка (main или master)
-const QUOTES_FILE = 'quotes.json';      // ← имя файла с цитатами
+// ---- НАСТРОЙКИ ПРОВАЙДЕРОВ ИИ ----
+// Все три используют OpenAI-совместимый API, различаются только base_url и моделями
+const AI_PROVIDERS = {
+    groq: {
+        name: 'Groq',
+        baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
+        models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-120b'],
+        defaultModel: 'llama-3.3-70b-versatile',
+        getKeyUrl: 'console.groq.com/keys',
+        helpText: 'Бесплатно, без Google-аккаунта. Регистрация по email на console.groq.com. Лимит: ~1000 запросов/день (70B) или ~14400/день (8B). Без банковской карты.'
+    },
+    openrouter: {
+        name: 'OpenRouter',
+        baseUrl: 'https://openrouter.ai/api/v1/chat/completions',
+        models: ['meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-2-9b-it:free', 'openrouter/free'],
+        defaultModel: 'meta-llama/llama-3.3-70b-instruct:free',
+        getKeyUrl: 'openrouter.ai/keys',
+        helpText: 'Бесплатные модели с суффиксом :free. Регистрация по email или GitHub на openrouter.ai. Лимит: 50 запросов/день без пополнения баланса. Без карты.'
+    },
+    mistral: {
+        name: 'Mistral AI',
+        baseUrl: 'https://api.mistral.ai/v1/chat/completions',
+        models: ['mistral-small-latest', 'mistral-large-latest', 'ministral-3b-latest'],
+        defaultModel: 'mistral-small-latest',
+        getKeyUrl: 'console.mistral.ai',
+        helpText: 'Бесплатный тариф Experiment. Регистрация по email на console.mistral.ai. Без карты. Лимиты видны в личном кабинете.'
+    }
+};
 
 // ---- БАЗОВЫЕ ЦИТАТЫ ----
 const BUILTIN_QUOTES = [
@@ -178,6 +233,7 @@ const BUILTIN_QUOTES = [
 
 // ---- ХРАНИЛИЩЕ ----
 let serverQuotes = [];
+let lastAIQuote = '';
 
 function getUserQuotes() {
     try { return JSON.parse(localStorage.getItem('wrong_quotes_user') || '[]'); }
@@ -202,18 +258,14 @@ function saveToken() {
     const input = document.getElementById('githubToken');
     const token = input.value.trim();
     const status = document.getElementById('tokenStatus');
-
     if (!token) {
         localStorage.removeItem('github_token');
         status.className = 'token-status err';
         status.textContent = 'Токен удалён.';
         return;
     }
-
     localStorage.setItem('github_token', token);
     input.value = '';
-
-    // Проверяем токен — пробуем прочитать файл
     checkToken(token).then(ok => {
         if (ok) {
             status.className = 'token-status ok';
@@ -229,15 +281,55 @@ async function checkToken(token) {
     try {
         const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}?ref=${GITHUB_BRANCH}`;
         const res = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/vnd.github+json'
-            }
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
         });
         return res.ok;
-    } catch(e) {
-        return false;
+    } catch(e) { return false; }
+}
+
+// ---- КЛЮЧ ИИ ----
+
+function getAIKey() {
+    return localStorage.getItem('ai_api_key') || '';
+}
+
+function getAIProvider() {
+    return localStorage.getItem('ai_provider') || 'groq';
+}
+
+function getAIModel() {
+    const provider = getAIProvider();
+    return localStorage.getItem('ai_model') || AI_PROVIDERS[provider].defaultModel;
+}
+
+function saveAIKey() {
+    const input = document.getElementById('aiKey');
+    const key = input.value.trim();
+    const status = document.getElementById('aiKeyStatus');
+    const provider = document.getElementById('aiProvider').value;
+
+    // Сохраняем выбранный провайдер
+    localStorage.setItem('ai_provider', provider);
+
+    if (!key) {
+        localStorage.removeItem('ai_api_key');
+        status.className = 'token-status err';
+        status.textContent = 'Ключ удалён.';
+        return;
     }
+    localStorage.setItem('ai_api_key', key);
+    // Сбрасываем модель на дефолтную для нового провайдера
+    localStorage.setItem('ai_model', AI_PROVIDERS[provider].defaultModel);
+    input.value = '';
+    status.className = 'token-status ok';
+    status.textContent = 'Ключ сохранён! Кнопка «Сгенерировать через ИИ» активна.';
+}
+
+function onProviderChange() {
+    const provider = document.getElementById('aiProvider').value;
+    const info = document.getElementById('aiProviderInfo');
+    const p = AI_PROVIDERS[provider];
+    info.innerHTML = `<p class="admin-info"><b>${p.name}:</b> ${p.helpText}<br>Получить ключ: <code>${p.getKeyUrl}</code><br>Доступные модели: <code>${p.models.join(', ')}</code></p>`;
 }
 
 // ---- ЗАГРУЗКА ЦИТАТ ----
@@ -245,26 +337,22 @@ async function checkToken(token) {
 async function loadQuotesFromServer() {
     const dot = document.getElementById('statusDot');
     const text = document.getElementById('statusText');
-
     try {
         const response = await fetch(QUOTES_FILE);
-
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
         const data = await response.json();
-
         if (Array.isArray(data) && data.length > 0) {
             serverQuotes = data;
             dot.className = 'status-dot ok';
-            text.textContent = `Загружено цитат: ${serverQuotes.length}. Всего доступно: ${getAllQuotes().length}`;
+            text.textContent = `Загружено цитат: ${serverQuotes.length}. Всего: ${getAllQuotes().length}`;
         } else {
             dot.className = 'status-dot ok';
-            text.textContent = `Файл найден. Всего доступно: ${BUILTIN_QUOTES.length} встроенных цитат.`;
+            text.textContent = `Файл найден. Встроенных: ${BUILTIN_QUOTES.length}.`;
         }
     } catch (e) {
         serverQuotes = [];
         dot.className = 'status-dot err';
-        text.textContent = `Файл ${QUOTES_FILE} не найден — используются встроенные (${BUILTIN_QUOTES.length}).`;
+        text.textContent = `Файл ${QUOTES_FILE} не найден — встроенные (${BUILTIN_QUOTES.length}).`;
     }
 }
 
@@ -274,86 +362,192 @@ async function addQuoteToRepo() {
     const textarea = document.getElementById('newQuoteText');
     const result = document.getElementById('saveResult');
     const text = textarea.value.trim();
-
     if (!text) { alert('Введите текст цитаты!'); return; }
     if (!/\{\d+\}/.test(text)) {
-        if (!confirm('В цитате нет плейсхолдеров вида {1}, {2}. Она будет статичной. Добавить всё равно?')) return;
+        if (!confirm('В цитате нет плейсхолдеров. Добавить всё равно?')) return;
     }
+    await publishQuote(text, result);
+    textarea.value = '';
+}
 
+async function publishAIQuote() {
+    if (!lastAIQuote) return;
+    const result = document.getElementById('saveResult');
+    await publishQuote(lastAIQuote, result);
+    document.getElementById('aiPublishBtn').classList.add('hidden');
+    lastAIQuote = '';
+}
+
+async function publishQuote(text, resultEl) {
     const token = getToken();
     if (!token) {
-        result.className = 'save-result err';
-        result.textContent = 'Сначала сохраните токен GitHub в поле выше.';
+        resultEl.className = 'save-result err';
+        resultEl.textContent = 'Сначала сохраните токен GitHub.';
         return;
     }
-
-    result.className = 'save-result';
-    result.textContent = 'Публикация…';
-
+    resultEl.className = 'save-result';
+    resultEl.textContent = 'Публикация…';
     try {
-        // 1. Читаем текущий файл
         const getUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}?ref=${GITHUB_BRANCH}`;
         const getRes = await fetch(getUrl, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/vnd.github+json'
-            }
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
         });
-
         if (!getRes.ok) throw new Error(`Не удалось прочитать файл (HTTP ${getRes.status})`);
-
         const fileData = await getRes.json();
         const sha = fileData.sha;
-
-        // 2. Декодируем содержимое
-        const currentContent = JSON.parse(
-            atob(fileData.content.replace(/\n/g, ''))
-        );
-
-        // 3. Добавляем новую цитату
+        const currentContent = JSON.parse(atob(fileData.content.replace(/\n/g, '')));
         currentContent.push(text);
-
-        // 4. Кодируем обратно в base64
         const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(currentContent, null, 2))));
-
-        // 5. Отправляем обновлённый файл
         const putUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}`;
         const putRes = await fetch(putUrl, {
             method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/vnd.github+json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: `Добавлена новая цитата`,
-                content: newContent,
-                sha: sha,
-                branch: GITHUB_BRANCH
-            })
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Добавлена новая цитата', content: newContent, sha: sha, branch: GITHUB_BRANCH })
         });
-
         if (!putRes.ok) {
             const errData = await putRes.json().catch(() => ({}));
             throw new Error(errData.message || `HTTP ${putRes.status}`);
         }
-
-        // 6. Обновляем локальный массив
         serverQuotes = currentContent;
-        textarea.value = '';
-        result.className = 'save-result ok';
-        result.textContent = 'Цитата опубликована! Она появится у всех посетителей через пару минут.';
-
+        resultEl.className = 'save-result ok';
+        resultEl.textContent = 'Цитата опубликована! Появится у всех через пару минут.';
         renderQuoteList();
         loadQuotesFromServer();
-
     } catch (e) {
-        result.className = 'save-result err';
-        result.textContent = 'Ошибка: ' + e.message;
+        resultEl.className = 'save-result err';
+        resultEl.textContent = 'Ошибка: ' + e.message;
     }
 }
 
-// ---- ЛОГИКА ГЕНЕРАЦИИ ----
+// ---- ГЕНЕРАЦИЯ ЧЕРЕЗ ИИ ----
+
+function buildAIPrompt(names) {
+    const charList = names.map((n, i) => {
+        const gender = n.gender === 'f' ? 'женский' : 'мужской';
+        return `${i + 1}. Пол: ${gender}`;
+    }).join('\n');
+
+    return `Ты — генератор смешных неправильных цитат для сайта. Создай ОДНУ короткую смешную цитату-диалог на русском языке.
+
+ПРАВИЛА ФОРМАТА (очень важно):
+- Используй {1} для имени первого персонажа, {2} для второго, {3} для третьего и т.д.
+- Для слов, которые меняются по роду, используй формат {N?мужской_вариант|женский_вариант}. Пример: {2?сделал|сделала}, {1?пришёл|пришла}, {2?осторожен|осторожна}
+- Каждая реплика с новой строки в формате: {N}: текст реплики
+- Можно добавить действие в звездочках, например: *раздаётся взрыв*
+- Диалог должен быть смешным, абсурдным или ироничным
+- 2-6 реплик, не больше
+- Выдай ТОЛЬКО текст цитаты без объяснений, без markdown, без кавычек вокруг
+
+ПЕРСОНАЖИ:
+${charList}
+
+ПРИМЕРЫ правильного формата:
+{1}: Ты {2?видел|видела} мой телефон?
+{2}: Нет, но я {2?слышал|слышала}, как он звонил из твоего кармана.
+{1}: И?
+{2}: Я {2?решил|решила}, что он занят.
+
+{1}: Я {1?нашёл|нашла} решение!
+{2}: Это решение создаёт три новые проблемы.
+{1}: Значит, три новых решения!
+
+СОЗДАЙ НОВУЮ ЦИТАТУ С ЭТИМИ ПЕРСОНАЖАМИ:`;
+}
+
+async function generateWithAI() {
+    const btn = document.getElementById('aiGenerateBtn');
+    const quoteBox = document.getElementById('quoteBox');
+    const aiKey = getAIKey();
+
+    if (!aiKey) {
+        alert('Для генерации через ИИ нужно сохранить ключ API в панели админа.');
+        return;
+    }
+
+    const rows = document.querySelectorAll('.name-field-row');
+    const names = Array.from(rows).map(row => {
+        const nameInput = row.querySelector('.name-field-input');
+        const genderSelect = row.querySelector('.gender-select');
+        return { name: nameInput.value.trim(), gender: genderSelect ? genderSelect.value : 'm' };
+    }).filter(n => n.name.length > 0);
+
+    if (names.length === 0) { alert('Введите хотя бы одно имя!'); return; }
+
+    btn.disabled = true;
+    btn.textContent = '✨ Генерация…';
+    quoteBox.innerHTML = '<p class="placeholder-text">ИИ придумывает цитату…</p>';
+
+    try {
+        const prompt = buildAIPrompt(names);
+        const provider = getAIProvider();
+        const model = getAIModel();
+        const providerConfig = AI_PROVIDERS[provider];
+        const url = providerConfig.baseUrl;
+
+        // Все три провайдера используют OpenAI-совместимый формат
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${aiKey}`
+        };
+
+        // OpenRouter дополнительно просит заголовки HTTP-Referer и X-Title
+        if (provider === 'openrouter') {
+            headers['HTTP-Referer'] = window.location.origin;
+            headers['X-Title'] = 'Генератор неправильных цитат';
+        }
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+                model: model,
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 1.2,
+                max_tokens: 500
+            })
+        });
+
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error?.message || errData.message || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const aiText = data.choices?.[0]?.message?.content?.trim();
+
+        if (!aiText) throw new Error('ИИ вернул пустой ответ');
+
+        // Очищаем от markdown и кавычек
+        let cleanText = aiText
+            .replace(/^```[\w]*\n?/gm, '')
+            .replace(/```$/gm, '')
+            .replace(/^["«]/, '')
+            .replace(/[»"]$/, '')
+            .trim();
+
+        if (!/\{\d+\}/.test(cleanText)) {
+            cleanText = '(Внимание: ИИ не использовал формат плейсхолдеров. Отредактируйте вручную.)\n' + cleanText;
+        }
+
+        lastAIQuote = cleanText;
+
+        const filled = fillTemplate(cleanText, names);
+        quoteBox.innerHTML = filled.split('\n').map(l => `<div class="quote-line">${l}</div>`).join('') +
+            '<div style="margin-top:.5rem"><span class="ai-source-badge">создано ИИ</span></div>';
+        quoteBox.dataset.rawText = filled;
+
+        document.getElementById('copyBtn').classList.remove('hidden');
+        document.getElementById('aiPublishBtn').classList.remove('hidden');
+
+    } catch (e) {
+        quoteBox.innerHTML = `<p class="placeholder-text">Ошибка ИИ: ${e.message}</p>`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '✨ Сгенерировать через ИИ';
+    }
+}
+
+// ---- ЛОГИКА ГЕНЕРАЦИИ (обычная) ----
 
 function countNamesNeeded(template) {
     let maxNum = 1;
@@ -396,30 +590,25 @@ function fillTemplate(template, names) {
 function generateQuote() {
     const all = getAllQuotes();
     if (all.length === 0) { alert('Цитаты не найдены!'); return; }
-
     const rows = document.querySelectorAll('.name-field-row');
     const names = Array.from(rows).map(row => {
         const nameInput = row.querySelector('.name-field-input');
         const genderSelect = row.querySelector('.gender-select');
-        return {
-            name: nameInput.value.trim(),
-            gender: genderSelect ? genderSelect.value : 'm'
-        };
+        return { name: nameInput.value.trim(), gender: genderSelect ? genderSelect.value : 'm' };
     }).filter(n => n.name.length > 0);
-
     if (names.length === 0) { alert('Введите хотя бы одно имя!'); return; }
-
     let attempts = 0, template;
     do {
         template = all[Math.floor(Math.random() * all.length)];
         attempts++;
     } while (countNamesNeeded(template) > names.length && attempts < 50);
-
     const filled = fillTemplate(template, names);
     const quoteBox = document.getElementById('quoteBox');
     quoteBox.innerHTML = filled.split('\n').map(l => `<div class="quote-line">${l}</div>`).join('');
     quoteBox.dataset.rawText = filled;
     document.getElementById('copyBtn').classList.remove('hidden');
+    document.getElementById('aiPublishBtn').classList.add('hidden');
+    lastAIQuote = '';
 }
 
 // ---- УПРАВЛЕНИЕ ИМЕНАМИ ----
@@ -428,23 +617,19 @@ function createNameField(value = '', gender = 'm') {
     const container = document.getElementById('nameFields');
     const row = document.createElement('div');
     row.className = 'name-field-row';
-
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'name-field-input';
     input.placeholder = `Имя ${container.children.length + 1}`;
     input.value = value;
-
     const genderSelect = document.createElement('select');
     genderSelect.className = 'gender-select';
     genderSelect.innerHTML = '<option value="m">М</option><option value="f">Ж</option>';
     genderSelect.value = gender;
-
     const btn = document.createElement('button');
     btn.className = 'remove-btn';
     btn.textContent = '×';
     btn.onclick = () => { row.remove(); updatePlaceholders(); };
-
     row.appendChild(input);
     row.appendChild(genderSelect);
     row.appendChild(btn);
@@ -486,16 +671,27 @@ function adminLogin() {
         document.getElementById('adminToggleBtn').textContent = 'Админ';
         document.getElementById('adminToggleBtn').onclick = null;
 
-        // Показываем статус токена
+        // Восстанавливаем выбранный провайдер
+        const savedProvider = getAIProvider();
+        document.getElementById('aiProvider').value = savedProvider;
+        onProviderChange();
+
         const tokenStatus = document.getElementById('tokenStatus');
         if (getToken()) {
             tokenStatus.className = 'token-status ok';
-            tokenStatus.textContent = 'Токен уже сохранён. Можно публиковать цитаты.';
+            tokenStatus.textContent = 'Токен GitHub сохранён.';
         } else {
             tokenStatus.className = 'token-status err';
-            tokenStatus.textContent = 'Токен не задан. Введите его в поле выше, чтобы публиковать цитаты.';
+            tokenStatus.textContent = 'Токен GitHub не задан.';
         }
-
+        const aiKeyStatus = document.getElementById('aiKeyStatus');
+        if (getAIKey()) {
+            aiKeyStatus.className = 'token-status ok';
+            aiKeyStatus.textContent = `Ключ ${AI_PROVIDERS[savedProvider].name} сохранён. Генерация через ИИ активна.`;
+        } else {
+            aiKeyStatus.className = 'token-status err';
+            aiKeyStatus.textContent = 'Ключ не задан. Введите его, чтобы включить генерацию.';
+        }
         renderQuoteList();
     } else {
         alert('Неверный пароль!');
@@ -513,19 +709,16 @@ function adminLogout() {
 function renderQuoteList() {
     const list = document.getElementById('quoteList');
     list.innerHTML = '';
-
     const builtinHeader = document.createElement('p');
     builtinHeader.style.cssText = 'font-size:.85rem;color:#666;margin-bottom:.3rem';
     builtinHeader.textContent = `Встроенные (${BUILTIN_QUOTES.length}) — нельзя удалить:`;
     list.appendChild(builtinHeader);
-
     if (serverQuotes.length > 0) {
         const serverHeader = document.createElement('p');
         serverHeader.style.cssText = 'font-size:.85rem;color:#666;margin:.8rem 0 .3rem';
         serverHeader.textContent = `Опубликованные (${serverQuotes.length}) — в репозитории:`;
         list.appendChild(serverHeader);
-
-        serverQuotes.forEach((q, i) => {
+        serverQuotes.forEach((q) => {
             const item = document.createElement('div');
             item.className = 'quote-item';
             const text = document.createElement('div');
