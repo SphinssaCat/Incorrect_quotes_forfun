@@ -1,9 +1,558 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Генератор неправильных цитат</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);color:#e0e0e0;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:2rem
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор неправильных цитат</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);color:#e0e0e0;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:2rem 1rem}
+.container{max-width:600px;width:100%;text-align:center}
+h1{font-size:1.8rem;margin-bottom:.3rem;color:#f5f5f5}
+.subtitle{color:#888;margin-bottom:1.5rem;font-size:.95rem}
+.names-section{margin-bottom:1rem}
+.names-section label{display:block;margin-bottom:.4rem;font-size:.9rem;color:#aaa}
+input[type=text],input[type=password],textarea,select{width:100%;padding:.6rem .8rem;border:1px solid #333;border-radius:6px;background:#0f0f23;color:#e0e0e0;font-size:1rem;margin-bottom:.5rem;font-family:inherit}
+input[type=text]::placeholder,input[type=password]::placeholder{color:#555}
+input[type=text]:focus,input[type=password]:focus,textarea:focus,select:focus{outline:none;border-color:#e94560}
+textarea{resize:vertical;min-height:80px;line-height:1.5}
+.name-fields{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem}
+.name-field-row{display:flex;gap:.5rem;align-items:center}
+.name-field-row input{margin-bottom:0;flex:1}
+.gender-select{width:auto!important;min-width:55px;margin-bottom:0;padding:.6rem .4rem;cursor:pointer;text-align:center}
+.remove-btn{background:#e94560;color:#fff;border:none;border-radius:6px;padding:0 .8rem;cursor:pointer;font-size:1.1rem;white-space:nowrap;height:36px}
+.remove-btn:hover{background:#c81e45}
+#addNameBtn{background:transparent;border:1px dashed #444;color:#888;padding:.4rem 1rem;border-radius:6px;cursor:pointer;font-size:.85rem}
+#addNameBtn:hover{border-color:#e94560;color:#e94560}
+button{font-family:inherit}
+#generateBtn{background:#e94560;color:#fff;border:none;padding:.8rem 2rem;border-radius:8px;font-size:1.05rem;cursor:pointer;margin-bottom:1.5rem;transition:background .2s}
+#generateBtn:hover{background:#c81e45}
+.quote-box{background:#0f0f23;border:1px solid #333;border-radius:10px;padding:1.5rem;min-height:100px;text-align:left;white-space:pre-wrap;line-height:1.6;font-size:1.05rem}
+.placeholder-text{color:#555;text-align:center}
+.quote-line{margin-bottom:.5rem}
+.quote-line:last-child{margin-bottom:0}
+.copy-btn,.admin-btn,.admin-panel-btn,.form-btn{background:transparent;border:1px solid #444;color:#aaa;padding:.5rem 1.5rem;border-radius:6px;cursor:pointer;margin-top:1rem;font-size:.9rem}
+.copy-btn:hover,.admin-btn:hover,.admin-panel-btn:hover,.form-btn:hover{border-color:#e94560;color:#e94560}
+.admin-btn{position:fixed;top:1rem;right:1rem;font-size:.8rem;padding:.35rem .8rem}
+.hidden{display:none!important}
+.admin-panel{background:#0f0f23;border:1px solid #444;border-radius:10px;padding:1.5rem;margin-top:1.5rem;text-align:left}
+.admin-panel h2{font-size:1.2rem;margin-bottom:1rem;color:#f5f5f5}
+.admin-login{text-align:left}
+.admin-login label{display:block;margin-bottom:.3rem;font-size:.9rem;color:#aaa}
+.admin-info{font-size:.8rem;color:#666;margin-top:.5rem;line-height:1.4}
+.quote-list{margin-top:1rem;max-height:200px;overflow-y:auto}
+.quote-item{background:#16213e;border:1px solid #222;border-radius:6px;padding:.6rem .8rem;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;font-size:.85rem;line-height:1.4}
+.quote-item-text{flex:1;white-space:pre-wrap;word-break:break-word}
+.quote-item-del{background:none;border:none;color:#e94560;cursor:pointer;font-size:1rem;padding:0 .3rem;white-space:nowrap}
+.quote-item-del:hover{color:#c81e45}
+.add-quote-form{margin-top:1rem}
+.form-btn{background:#e94560;color:#fff;border:none}
+.form-btn:hover{background:#c81e45;color:#fff}
+.badge{display:inline-block;background:#e94560;color:#fff;font-size:.7rem;padding:.15rem .5rem;border-radius:4px;margin-left:.5rem;vertical-align:middle}
+.hint{font-size:.75rem;color:#666;margin-top:.3rem;line-height:1.4}
+.syntax-help{font-size:.78rem;color:#888;background:#16213e;border:1px solid #222;border-radius:6px;padding:.6rem .8rem;margin-top:.5rem;line-height:1.5}
+.syntax-help code{background:#0f0f23;padding:.1rem .3rem;border-radius:3px;color:#e94560}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:.3rem;vertical-align:middle}
+.status-dot.ok{background:#4caf50}
+.status-dot.err{background:#e94560}
+.status-dot.loading{background:#ffa726}
+.status-text{font-size:.8rem;color:#666;margin-bottom:.5rem;text-align:left}
+.token-section{margin-bottom:1rem;padding:.8rem;background:#16213e;border:1px solid #222;border-radius:6px}
+.token-section label{display:block;margin-bottom:.3rem;font-size:.85rem;color:#aaa}
+.token-status{font-size:.8rem;margin-top:.3rem}
+.token-status.ok{color:#4caf50}
+.token-status.err{color:#e94560}
+.save-result{font-size:.8rem;margin-top:.3rem}
+.save-result.ok{color:#4caf50}
+.save-result.err{color:#e94560}
+</style>
+</head>
+<body>
+
+<button class="admin-btn" id="adminToggleBtn" onclick="toggleAdminLogin()">Вход для админа</button>
+
+<div class="container">
+<h1>Генератор неправильных цитат</h1>
+<p class="subtitle">Подставьте имена — получите хаос</p>
+
+<p id="serverStatus" class="status-text">
+<span class="status-dot loading" id="statusDot"></span><span id="statusText">Загрузка цитат…</span>
+</p>
+
+<div class="names-section">
+<label for="namesInput">Имена персонажей (через запятую):</label>
+<input type="text" id="namesInput" placeholder="Анна, Борис, Вера" />
+<p class="hint">Введите имена через запятую и нажмите Enter — или добавьте поля по одному. У каждого имени можно выбрать пол (М/Ж).</p>
+<button id="addNameBtn" onclick="createNameField()">Добавить поле</button>
+</div>
+
+<div id="nameFields" class="name-fields"></div>
+
+<button id="generateBtn" onclick="generateQuote()">Сгенерировать цитату</button>
+
+<div id="quoteBox" class="quote-box">
+<p class="placeholder-text">Нажмите «Сгенерировать», чтобы получить цитату</p>
+</div>
+
+<button class="copy-btn hidden" id="copyBtn" onclick="copyQuote()">Скопировать</button>
+
+<!-- Панель входа админа -->
+<div id="adminLoginPanel" class="admin-panel admin-login hidden">
+<h2>Вход для администратора</h2>
+<label for="adminPass">Пароль:</label>
+<input type="password" id="adminPass" placeholder="Введите пароль" onkeydown="if(event.key==='Enter')adminLogin()"/>
+<button class="form-btn" onclick="adminLogin()">Войти</button>
+<p class="admin-info">Смените пароль в коде (переменная ADMIN_PASSWORD).</p>
+</div>
+
+<!-- Панель управления админа -->
+<div id="adminPanel" class="admin-panel hidden">
+<h2>Управление цитатами <span class="badge">admin</span></h2>
+
+<!-- Настройка токена GitHub -->
+<div class="token-section">
+<label for="githubToken">Токен GitHub API (fine-grained):</label>
+<input type="password" id="githubToken" placeholder="github_pat_..." onkeydown="if(event.key==='Enter')saveToken()" />
+<button class="form-btn" onclick="saveToken()">Сохранить токен</button>
+<p class="token-status" id="tokenStatus"></p>
+<p class="admin-info">Токен хранится только в вашем браузере (localStorage) и не попадает в исходный код.<br>
+Создайте fine-grained token с правом <strong>Contents: Read and write</strong> для этого репозитория.<br>
+Настройки GitHub → Developer settings → Personal access tokens → Fine-grained tokens.</p>
+</div>
+
+<div class="add-quote-form">
+<label style="display:block;margin-bottom:.3rem;font-size:.9rem;color:#aaa">Новая цитата:</label>
+<textarea id="newQuoteText" placeholder='{1}: Что делаешь?&#10;{2}: Совершаю ошибку, но с уверенностью.&#10;&#10;Используйте {1}, {2}, {3} для имён.&#10;Для гендерных вариантов: {2?сделал|сделала}&#10;Перенос строки — Enter.'></textarea>
+<button class="form-btn" onclick="addQuoteToRepo()">Опубликовать цитату</button>
+<p class="save-result" id="saveResult"></p>
+<div class="syntax-help">
+<b>Синтаксис:</b><br>
+<code>{1}</code>, <code>{2}</code> — имена персонажей по порядку.<br>
+<code>{2?сделал|сделала}</code> — гендерный вариант: мужской|женский.<br>
+«Опубликовать» — добавляет цитату в репозиторий, она станет видна всем посетителям.
+</div>
+</div>
+
+<div class="quote-list" id="quoteList"></div>
+
+<button class="admin-panel-btn" onclick="adminLogout()" style="margin-top:1rem">Выйти из режима админа</button>
+</div>
+</div>
+
+<script>
+// ============================================================
+//  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ — версия с записью в GitHub
+// ============================================================
+
+// ---- НАСТРОЙКИ ----
+const ADMIN_PASSWORD = 'grim17';
+
+// Данные репозитория — ЗАМЕНИТЕ НА СВОИ
+const GITHUB_OWNER = 'SphinssaCat';       // ← ваш логин GitHub
+const GITHUB_REPO = 'Incorrect_quotes_forfun'; // ← имя репозитория
+const GITHUB_BRANCH = 'main';           // ← ветка (main или master)
+const QUOTES_FILE = 'quotes.json';      // ← имя файла с цитатами
+
+// ---- БАЗОВЫЕ ЦИТАТЫ ----
+const BUILTIN_QUOTES = [
+    "{1}: Мы не можем просто уйти отсюда!\n{2}: WATCH ME.",
+    "{1}: Что ты делаешь?\n{2}: Совершаю ошибку, но с уверенностью.",
+    "{1}: У тебя есть план?\n{2}: План — это просто список того, что не сработает. У меня есть идея.",
+    "{1}: Я не могу поверить, что ты это {2?сделал|сделала}.\n{2}: Я тоже не могу. Поэтому перепроверь, точно ли это {2?был|была} я.",
+    "{1}: Объясни мне это так, будто мне пять лет.\n{2}: Ладно. Тебе пять лет. Тебе нельзя это знать.",
+    "{1}: Ты опять всё {2?испортил|испортила}.\n{2}: Я не {2?испортил|испортила}. Я {2?улучшил|улучшила} в неожиданном направлении.",
+    "{1}: Как думаешь, что пойдёт не так?\n{2}: Всё. Но по-разному, и это уже интересно.",
+    "{1}: Ты только что {2?выпил|выпила} чужой кофе?\n{2}: Нет. Я {2?выпил|выпила} СВОЙ кофе. Просто он оказался в чужой чашке.",
+    "{1}: Это плохая идея.\n{2}: Все лучшие идеи начинаются с этой фразы.",
+    "{1}: Ты же понимаешь, что это незаконно?\n{2}: Незаконно — это слишком сильное слово. Я бы {2?сказал|сказала} «не поощряется».",
+    "{1}: Сколько тебе нужно времени?\n{2}: Двадцать минут.\n{1}: У тебя пять.\n{2}: Тогда мне пять.",
+    "{1}: Почему у тебя на лице такое выражение?\n{2}: Это моё лицо. Оно всегда такое.\n{1}: Нет, обычно оно хуже.\n{2}: О, спасибо.",
+    "{1}: Я {1?приготовил|приготовила} ужин.\n{2}: Почему в духовке огонь?\n{1}: Это для атмосферы.",
+    "{1}: Ты {2?обещал|обещала}, что больше так не будешь.\n{2}: Я {2?обещал|обещала}, что постараюсь. Это разные вещи.\n{3}: Вы оба плохо знаете этого человека.",
+    "{1}: Что самое худшее, что может случиться?\n{2}: Ты серьёзно? Каждый раз, когда кто-то говорит эту фразу, что-то случается.\n{1}: Ну, это просто совпадение...\n*раздаётся взрыв*",
+    "{1}: Я могу объяснить.\n{2}: Ты всегда можешь объяснить. Проблема в том, что объяснения никогда не бывают хорошими.",
+    "{1}: Ты вообще {2?спал|спала} этой ночью?\n{2}: Сон — это для тех, у кого нет нерешённых проблем. А у меня их полно.",
+    "{1}: Будь {2?осторожен|осторожна}.\n{2}: Осторожность — это просто страх в красивой обёртке.\n{1}: Иногда осторожность спасает жизнь.\n{2}: А иногда она портит вечер.",
+    "{1}: Ты доверяешь этому человеку?\n{2}: Я доверяю тому, что он будет действовать в своих интересах. Это предсказуемо."
+];
+
+// ---- ХРАНИЛИЩЕ ----
+let serverQuotes = [];
+
+function getUserQuotes() {
+    try { return JSON.parse(localStorage.getItem('wrong_quotes_user') || '[]'); }
+    catch(e) { return []; }
+}
+
+function saveUserQuotes(arr) {
+    localStorage.setItem('wrong_quotes_user', JSON.stringify(arr));
+}
+
+function getAllQuotes() {
+    return BUILTIN_QUOTES.concat(serverQuotes, getUserQuotes());
+}
+
+// ---- ТОКЕН GITHUB ----
+
+function getToken() {
+    return localStorage.getItem('github_token') || '';
+}
+
+function saveToken() {
+    const input = document.getElementById('githubToken');
+    const token = input.value.trim();
+    const status = document.getElementById('tokenStatus');
+
+    if (!token) {
+        localStorage.removeItem('github_token');
+        status.className = 'token-status err';
+        status.textContent = 'Токен удалён.';
+        return;
+    }
+
+    localStorage.setItem('github_token', token);
+    input.value = '';
+
+    // Проверяем токен — пробуем прочитать файл
+    checkToken(token).then(ok => {
+        if (ok) {
+            status.className = 'token-status ok';
+            status.textContent = 'Токен работает! Можно публиковать цитаты.';
+        } else {
+            status.className = 'token-status err';
+            status.textContent = 'Токен не работает. Проверьте права и данные репозитория.';
+        }
+    });
+}
+
+async function checkToken(token) {
+    try {
+        const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}?ref=${GITHUB_BRANCH}`;
+        const res = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/vnd.github+json'
+            }
+        });
+        return res.ok;
+    } catch(e) {
+        return false;
+    }
+}
+
+// ---- ЗАГРУЗКА ЦИТАТ ----
+
+async function loadQuotesFromServer() {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+
+    try {
+        const response = await fetch(QUOTES_FILE);
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+
+        if (Array.isArray(data) && data.length > 0) {
+            serverQuotes = data;
+            dot.className = 'status-dot ok';
+            text.textContent = `Загружено цитат: ${serverQuotes.length}. Всего доступно: ${getAllQuotes().length}`;
+        } else {
+            dot.className = 'status-dot ok';
+            text.textContent = `Файл найден. Всего доступно: ${BUILTIN_QUOTES.length} встроенных цитат.`;
+        }
+    } catch (e) {
+        serverQuotes = [];
+        dot.className = 'status-dot err';
+        text.textContent = `Файл ${QUOTES_FILE} не найден — используются встроенные (${BUILTIN_QUOTES.length}).`;
+    }
+}
+
+// ---- ЗАПИСЬ ЦИТАТЫ В РЕПОЗИТОРИЙ ----
+
+async function addQuoteToRepo() {
+    const textarea = document.getElementById('newQuoteText');
+    const result = document.getElementById('saveResult');
+    const text = textarea.value.trim();
+
+    if (!text) { alert('Введите текст цитаты!'); return; }
+    if (!/\{\d+\}/.test(text)) {
+        if (!confirm('В цитате нет плейсхолдеров вида {1}, {2}. Она будет статичной. Добавить всё равно?')) return;
+    }
+
+    const token = getToken();
+    if (!token) {
+        result.className = 'save-result err';
+        result.textContent = 'Сначала сохраните токен GitHub в поле выше.';
+        return;
+    }
+
+    result.className = 'save-result';
+    result.textContent = 'Публикация…';
+
+    try {
+        // 1. Читаем текущий файл
+        const getUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}?ref=${GITHUB_BRANCH}`;
+        const getRes = await fetch(getUrl, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/vnd.github+json'
+            }
+        });
+
+        if (!getRes.ok) throw new Error(`Не удалось прочитать файл (HTTP ${getRes.status})`);
+
+        const fileData = await getRes.json();
+        const sha = fileData.sha;
+
+        // 2. Декодируем содержимое
+        const currentContent = JSON.parse(
+            atob(fileData.content.replace(/\n/g, ''))
+        );
+
+        // 3. Добавляем новую цитату
+        currentContent.push(text);
+
+        // 4. Кодируем обратно в base64
+        const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(currentContent, null, 2))));
+
+        // 5. Отправляем обновлённый файл
+        const putUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}`;
+        const putRes = await fetch(putUrl, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: `Добавлена новая цитата`,
+                content: newContent,
+                sha: sha,
+                branch: GITHUB_BRANCH
+            })
+        });
+
+        if (!putRes.ok) {
+            const errData = await putRes.json().catch(() => ({}));
+            throw new Error(errData.message || `HTTP ${putRes.status}`);
+        }
+
+        // 6. Обновляем локальный массив
+        serverQuotes = currentContent;
+        textarea.value = '';
+        result.className = 'save-result ok';
+        result.textContent = 'Цитата опубликована! Она появится у всех посетителей через пару минут.';
+
+        renderQuoteList();
+        loadQuotesFromServer();
+
+    } catch (e) {
+        result.className = 'save-result err';
+        result.textContent = 'Ошибка: ' + e.message;
+    }
+}
+
+// ---- ЛОГИКА ГЕНЕРАЦИИ ----
+
+function countNamesNeeded(template) {
+    let maxNum = 1;
+    const nameMatches = template.match(/\{(\d+)\}/g);
+    if (nameMatches) {
+        nameMatches.forEach(m => {
+            const num = parseInt(m.replace(/[{}]/g, ''));
+            if (num > maxNum) maxNum = num;
+        });
+    }
+    const genderMatches = template.match(/\{(\d+)\?[^}]*\}/g);
+    if (genderMatches) {
+        genderMatches.forEach(m => {
+            const num = parseInt(m.match(/\{(\d+)\?/)[1]);
+            if (num > maxNum) maxNum = num;
+        });
+    }
+    return maxNum;
+}
+
+function fillTemplate(template, names) {
+    let result = template;
+    result = result.replace(/\{(\d+)\?([^}]*)\}/g, (match, num, content) => {
+        const pipeIdx = content.indexOf('|');
+        if (pipeIdx === -1) return match;
+        const maleText = content.substring(0, pipeIdx);
+        const femaleText = content.substring(pipeIdx + 1);
+        const idx = parseInt(num) - 1;
+        const person = names[idx];
+        if (person && person.gender === 'f') return femaleText;
+        return maleText;
+    });
+    for (let i = 0; i < names.length; i++) {
+        result = result.split(`{${i+1}}`).join(names[i].name || `Персонаж ${i+1}`);
+    }
+    result = result.replace(/\{(\d+)\}/g, (match, num) => `Персонаж ${num}`);
+    return result;
+}
+
+function generateQuote() {
+    const all = getAllQuotes();
+    if (all.length === 0) { alert('Цитаты не найдены!'); return; }
+
+    const rows = document.querySelectorAll('.name-field-row');
+    const names = Array.from(rows).map(row => {
+        const nameInput = row.querySelector('.name-field-input');
+        const genderSelect = row.querySelector('.gender-select');
+        return {
+            name: nameInput.value.trim(),
+            gender: genderSelect ? genderSelect.value : 'm'
+        };
+    }).filter(n => n.name.length > 0);
+
+    if (names.length === 0) { alert('Введите хотя бы одно имя!'); return; }
+
+    let attempts = 0, template;
+    do {
+        template = all[Math.floor(Math.random() * all.length)];
+        attempts++;
+    } while (countNamesNeeded(template) > names.length && attempts < 50);
+
+    const filled = fillTemplate(template, names);
+    const quoteBox = document.getElementById('quoteBox');
+    quoteBox.innerHTML = filled.split('\n').map(l => `<div class="quote-line">${l}</div>`).join('');
+    quoteBox.dataset.rawText = filled;
+    document.getElementById('copyBtn').classList.remove('hidden');
+}
+
+// ---- УПРАВЛЕНИЕ ИМЕНАМИ ----
+
+function createNameField(value = '', gender = 'm') {
+    const container = document.getElementById('nameFields');
+    const row = document.createElement('div');
+    row.className = 'name-field-row';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'name-field-input';
+    input.placeholder = `Имя ${container.children.length + 1}`;
+    input.value = value;
+
+    const genderSelect = document.createElement('select');
+    genderSelect.className = 'gender-select';
+    genderSelect.innerHTML = '<option value="m">М</option><option value="f">Ж</option>';
+    genderSelect.value = gender;
+
+    const btn = document.createElement('button');
+    btn.className = 'remove-btn';
+    btn.textContent = '×';
+    btn.onclick = () => { row.remove(); updatePlaceholders(); };
+
+    row.appendChild(input);
+    row.appendChild(genderSelect);
+    row.appendChild(btn);
+    container.appendChild(row);
+}
+
+function updatePlaceholders() {
+    document.querySelectorAll('.name-field-input').forEach((inp, i) => {
+        inp.placeholder = `Имя ${i + 1}`;
+    });
+}
+
+// ---- КОПИРОВАНИЕ ----
+
+function copyQuote() {
+    const text = document.getElementById('quoteBox').dataset.rawText || '';
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = 'Скопировано!';
+        setTimeout(() => btn.textContent = 'Скопировать', 1500);
+    });
+}
+
+// ---- АДМИНКА ----
+
+let isAdmin = false;
+
+function toggleAdminLogin() {
+    if (isAdmin) return;
+    document.getElementById('adminLoginPanel').classList.toggle('hidden');
+}
+
+function adminLogin() {
+    const pass = document.getElementById('adminPass').value;
+    if (pass === ADMIN_PASSWORD) {
+        isAdmin = true;
+        document.getElementById('adminLoginPanel').classList.add('hidden');
+        document.getElementById('adminPanel').classList.remove('hidden');
+        document.getElementById('adminToggleBtn').textContent = 'Админ';
+        document.getElementById('adminToggleBtn').onclick = null;
+
+        // Показываем статус токена
+        const tokenStatus = document.getElementById('tokenStatus');
+        if (getToken()) {
+            tokenStatus.className = 'token-status ok';
+            tokenStatus.textContent = 'Токен уже сохранён. Можно публиковать цитаты.';
+        } else {
+            tokenStatus.className = 'token-status err';
+            tokenStatus.textContent = 'Токен не задан. Введите его в поле выше, чтобы публиковать цитаты.';
+        }
+
+        renderQuoteList();
+    } else {
+        alert('Неверный пароль!');
+    }
+    document.getElementById('adminPass').value = '';
+}
+
+function adminLogout() {
+    isAdmin = false;
+    document.getElementById('adminPanel').classList.add('hidden');
+    document.getElementById('adminToggleBtn').textContent = 'Вход для админа';
+    document.getElementById('adminToggleBtn').onclick = toggleAdminLogin;
+}
+
+function renderQuoteList() {
+    const list = document.getElementById('quoteList');
+    list.innerHTML = '';
+
+    const builtinHeader = document.createElement('p');
+    builtinHeader.style.cssText = 'font-size:.85rem;color:#666;margin-bottom:.3rem';
+    builtinHeader.textContent = `Встроенные (${BUILTIN_QUOTES.length}) — нельзя удалить:`;
+    list.appendChild(builtinHeader);
+
+    if (serverQuotes.length > 0) {
+        const serverHeader = document.createElement('p');
+        serverHeader.style.cssText = 'font-size:.85rem;color:#666;margin:.8rem 0 .3rem';
+        serverHeader.textContent = `Опубликованные (${serverQuotes.length}) — в репозитории:`;
+        list.appendChild(serverHeader);
+
+        serverQuotes.forEach((q, i) => {
+            const item = document.createElement('div');
+            item.className = 'quote-item';
+            const text = document.createElement('div');
+            text.className = 'quote-item-text';
+            text.textContent = q;
+            item.appendChild(text);
+            list.appendChild(item);
+        });
+    }
+}
+
+// ---- ИНИЦИАЛИЗАЦИЯ ----
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadQuotesFromServer();
+    createNameField(); createNameField(); createNameField();
+    document.getElementById('namesInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            const names = e.target.value.split(',').map(n => n.trim()).filter(n => n.length > 0);
+            if (names.length > 0) {
+                document.getElementById('nameFields').innerHTML = '';
+                names.forEach(n => createNameField(n, 'm'));
+                e.target.value = '';
+            }
+        }
+    });
+});
+</script>
+</body>
+</html>
