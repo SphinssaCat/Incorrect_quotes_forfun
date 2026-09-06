@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор неправильных цитат</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);color:#e0e0e0;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:2rem 1rem}
+.container{max-width:600px;width:100%;text-align:center}
+h1{font-size:1.8rem;margin-bottom:.3rem;color:#f5f5f5}
+.subtitle{color:#888;margin-bottom:1.5rem;font-size:.95rem}
+.names-section{margin-bottom:1rem}
+.names-section label{display:block;margin-bottom:.4rem;font-size:.9rem;color:#aaa}
+input[type=text],input[type=password],textarea{width:100%;padding:.6rem .8rem;border:1px solid #333;border-radius:6px;background:#0f0f23;color:#e0e0e0;font-size:1rem;margin-bottom:.5rem;font-family:inherit}
+input[type=text]::placeholder,input[type=password]::placeholder{color:#555}
+input[type=text]:focus,input[type=password]:focus,textarea:focus{outline:none;border-color:#e94560}
+textarea{resize:vertical;min-height:80px;line-height:1.5}
+.name-fields{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem}
+.name-field-row{display:flex;gap:.5rem}
+.name-field-row input{margin-bottom:0}
+.remove-btn{background:#e94560;color:#fff;border:none;border-radius:6px;padding:0 .8rem;cursor:pointer;font-size:1.1rem;white-space:nowrap}
+.remove-btn:hover{background:#c81e45}
+#addNameBtn{background:transparent;border:1px dashed #444;color:#888;padding:.4rem 1rem;border-radius:6px;cursor:pointer;font-size:.85rem}
+#addNameBtn:hover{border-color:#e94560;color:#e94560}
+button{font-family:inherit}
+#generateBtn{background:#e94560;color:#fff;border:none;padding:.8rem 2rem;border-radius:8px;font-size:1.05rem;cursor:pointer;margin-bottom:1.5rem;transition:background .2s}
+#generateBtn:hover{background:#c81e45}
+.quote-box{background:#0f0f23;border:1px solid #333;border-radius:10px;padding:1.5rem;min-height:100px;text-align:left;white-space:pre-wrap;line-height:1.6;font-size:1.05rem}
+.placeholder-text{color:#555;text-align:center}
+.quote-line{margin-bottom:.5rem}
+.quote-line:last-child{margin-bottom:0}
+.copy-btn,.admin-btn,.admin-panel-btn,.form-btn{background:transparent;border:1px solid #444;color:#aaa;padding:.5rem 1.5rem;border-radius:6px;cursor:pointer;margin-top:1rem;font-size:.9rem}
+.copy-btn:hover,.admin-btn:hover,.admin-panel-btn:hover,.form-btn:hover{border-color:#e94560;color:#e94560}
+.admin-btn{position:fixed;top:1rem;right:1rem;font-size:.8rem;padding:.35rem .8rem}
+.hidden{display:none!important}
+.admin-panel{background:#0f0f23;border:1px solid #444;border-radius:10px;padding:1.5rem;margin-top:1.5rem;text-align:left}
+.admin-panel h2{font-size:1.2rem;margin-bottom:1rem;color:#f5f5f5}
+.admin-login{text-align:left}
+.admin-login label{display:block;margin-bottom:.3rem;font-size:.9rem;color:#aaa}
+.admin-info{font-size:.8rem;color:#666;margin-top:.5rem;line-height:1.4}
+.quote-list{margin-top:1rem;max-height:200px;overflow-y:auto}
+.quote-item{background:#16213e;border:1px solid #222;border-radius:6px;padding:.6rem .8rem;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;font-size:.85rem;line-height:1.4}
+.quote-item-text{flex:1;white-space:pre-wrap;word-break:break-word}
+.quote-item-del{background:none;border:none;color:#e94560;cursor:pointer;font-size:1rem;padding:0 .3rem;white-space:nowrap}
+.quote-item-del:hover{color:#c81e45}
+.add-quote-form{margin-top:1rem}
+.form-btn{background:#e94560;color:#fff;border:none}
+.form-btn:hover{background:#c81e45;color:#fff}
+.badge{display:inline-block;background:#e94560;color:#fff;font-size:.7rem;padding:.15rem .5rem;border-radius:4px;margin-left:.5rem;vertical-align:middle}
+</style>
+</head>
+<body>
+
+<button class="admin-btn" id="adminToggleBtn" onclick="toggleAdminLogin()">Вход для админа</button>
+
+<div class="container">
+<h1>Генератор неправильных цитат</h1>
+<p class="subtitle">Подставьте имена — получите хаос</p>
+
+<div class="names-section">
+<label for="namesInput">Имена персонажей (через запятую):</label>
+<input type="text" id="namesInput" placeholder="Анна, Борис, Вера" />
+<button id="addNameBtn" onclick="createNameField()">Добавить поле</button>
+</div>
+
+<div id="nameFields" class="name-fields"></div>
+
+<button id="generateBtn" onclick="generateQuote()">Сгенерировать цитату</button>
+
+<div id="quoteBox" class="quote-box">
+<p class="placeholder-text">Нажмите «Сгенерировать», чтобы получить цитату</p>
+</div>
+
+<button class="copy-btn hidden" id="copyBtn" onclick="copyQuote()">Скопировать</button>
+
+<!-- Панель входа админа -->
+<div id="adminLoginPanel" class="admin-panel admin-login hidden">
+<h2>Вход для администратора</h2>
+<label for="adminPass">Пароль:</label>
+<input type="password" id="adminPass" placeholder="Введите пароль" onkeydown="if(event.key==='Enter')adminLogin()"/>
+<button class="form-btn" onclick="adminLogin()">Войти</button>
+<p class="admin-info">Смените пароль в коде (переменная ADMIN_PASSWORD).</p>
+</div>
+
+<!-- Панель управления админа -->
+<div id="adminPanel" class="admin-panel hidden">
+<h2>Управление цитатами <span class="badge">admin</span></h2>
+
+<div class="add-quote-form">
+<label style="display:block;margin-bottom:.3rem;font-size:.9rem;color:#aaa">Новая цитата:</label>
+<textarea id="newQuoteText" placeholder='{1}: Что делаешь?&#10;{2}: Совершаю ошибку, но с уверенностью.&#10;&#10;Используйте {1}, {2}, {3} для имён и перенос строки (Enter) для новых реплик.'></textarea>
+<button class="form-btn" onclick="addQuote()">Добавить цитату</button>
+</div>
+
+<div class="quote-list" id="quoteList"></div>
+
+<button class="admin-panel-btn" onclick="adminLogout()" style="margin-top:1rem">Выйти из режима админа</button>
+</div>
+</div>
+
+<script>
+// ============================================================
+//  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ — всё в одном файле
+// ============================================================
+
+// ---- НАСТРОЙКИ АДМИНА ----
+// Смените пароль на свой перед публикацией!
+const ADMIN_PASSWORD = 'grim17';
+
+// ---- БАЗОВЫЕ ЦИТАТЫ (встроенные) ----
+const BUILTIN_QUOTES = [
+    "{1}: Мы не можем просто уйти отсюда!\n{2}: WATCH ME.",
+    "{1}: Что ты делаешь?\n{2}: Совершаю ошибку, но с уверенностью.",
+    "{1}: У тебя есть план?\n{2}: План — это просто список того, что не сработает. У меня есть идея.",
+    "{1}: Я не могу поверить, что ты это сделал.\n{2}: Я тоже не могу. Поэтому перепроверь, точно ли это был я.",
+    "{1}: Объясни мне это так, будто мне пять лет.\n{2}: Ладно. Тебе пять лет. Тебе нельзя это знать.",
+    "{1}: Ты опять всё испортил.\n{2}: Я не испортил. Я улучшил в неожиданном направлении.",
+    "{1}: Как думаешь, что пойдёт не так?\n{2}: Всё. Но по-разному, и это уже интересно.",
+    "{1}: Ты только что выпил чужой кофе?\n{2}: Нет. Я выпил СВОЙ кофе. Просто он оказался в чужой чашке.",
+    "{1}: Это плохая идея.\n{2}: Все лучшие идеи начинаются с этой фразы.",
+    "{1}: Ты же понимаешь, что это незаконно?\n{2}: Незаконно — это слишком сильное слово. Я бы сказал «не поощряется».",
+    "{1}: Сколько тебе нужно времени?\n{2}: Двадцать минут.\n{1}: У тебя пять.\n{2}: Тогда мне пять.",
+    "{1}: Почему у тебя на лице такое выражение?\n{2}: Это моё лицо. Оно всегда такое.\n{1}: Нет, обычно оно хуже.\n{2}: О, спасибо.",
+    "{1}: Я приготовил ужин.\n{2}: Почему в духовке огонь?\n{1}: Это для атмосферы.",
+    "{1}: Ты обещал, что больше так не будешь.\n{2}: Я обещал, что постараюсь. Это разные вещи.\n{3}: Вы оба плохо знаете этого человека.",
+    "{1}: Что самое худшее, что может случиться?\n{2}: Ты серьёзно? Каждый раз, когда кто-то говорит эту фразу, что-то случается.\n{1}: Ну, это просто совпадение...\n*раздаётся взрыв*",
+    "{1}: Я могу объяснить.\n{2}: Ты всегда можешь объяснить. Проблема в том, что объяснения никогда не бывают хорошими.",
+    "{1}: Ты вообще спал этой ночью?\n{2}: Сон — это для тех, у кого нет нерешённых проблем. А у меня их полно.",
+    "{1}: Будь осторожен.\n{2}: Осторожность — это просто страх в красивой обёртке.\n{1}: Иногда осторожность спасает жизнь.\n{2}: А иногда она портит вечер.",
+    "{1}: Ты доверяешь этому человеку?\n{2}: Я доверяю тому, что он будет действовать в своих интересах. Это предсказуемо."
+];
+
+// ---- ХРАНИЛИЩЕ ----
+// Пользовательские цитаты хранятся в localStorage браузера.
+// Базовые цитаты всегда подгружаются из кода.
+
+function getUserQuotes() {
+    try { return JSON.parse(localStorage.getItem('wrong_quotes_user') || '[]'); }
+    catch(e) { return []; }
+}
+
+function saveUserQuotes(arr) {
+    localStorage.setItem('wrong_quotes_user', JSON.stringify(arr));
+}
+
+function getAllQuotes() {
+    return BUILTIN_QUOTES.concat(getUserQuotes());
+}
+
+// ---- ЛОГИКА ГЕНЕРАЦИИ ----
+
+function countNamesNeeded(template) {
+    const matches = template.match(/\{(\d+)\}/g);
+    if (!matches) return 1;
+    return Math.max(...matches.map(m => parseInt(m.replace(/[{}]/g, ''))));
+}
+
+function fillTemplate(template, names) {
+    let result = template;
+    for (let i = 0; i < names.length; i++) {
+        result = result.split(`{${i+1}}`).join(names[i] || `Персонаж ${i+1}`);
+    }
+    // Заменяем оставшиеся плейсхолдеры, для которых не хватило имён
+    result = result.replace(/\{(\d+)\}/g, (match, num) => `Персонаж ${num}`);
+    return result;
+}
+
+function generateQuote() {
+    const all = getAllQuotes();
+    if (all.length === 0) { alert('Цитаты не найдены!'); return; }
+    const nameFields = document.querySelectorAll('.name-field-input');
+    const names = Array.from(nameFields).map(i => i.value.trim()).filter(n => n.length > 0);
+    if (names.length === 0) { alert('Введите хотя бы одно имя!'); return; }
+
+    let attempts = 0, template;
+    do {
+        template = all[Math.floor(Math.random() * all.length)];
+        attempts++;
+    } while (countNamesNeeded(template) > names.length && attempts < 50);
+
+    const filled = fillTemplate(template, names);
+    const quoteBox = document.getElementById('quoteBox');
+    quoteBox.innerHTML = filled.split('\n').map(l => `<div class="quote-line">${l}</div>`).join('');
+    quoteBox.dataset.rawText = filled;
+    document.getElementById('copyBtn').classList.remove('hidden');
+}
+
+// ---- УПРАВЛЕНИЕ ИМЕНАМИ ----
+
+function createNameField(value = '') {
+    const container = document.getElementById('nameFields');
+    const row = document.createElement('div');
+    row.className = 'name-field-row';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'name-field-input';
+    input.placeholder = `Имя ${container.children.length + 1}`;
+    input.value = value;
+    const btn = document.createElement('button');
+    btn.className = 'remove-btn';
+    btn.textContent = '×';
+    btn.onclick = () => { row.remove(); updatePlaceholders(); };
+    row.appendChild(input);
+    row.appendChild(btn);
+    container.appendChild(row);
+}
+
+function updatePlaceholders() {
+    document.querySelectorAll('.name-field-input').forEach((inp, i) => {
+        inp.placeholder = `Имя ${i + 1}`;
+    });
+}
+
+// ---- КОПИРОВАНИЕ ----
+
+function copyQuote() {
+    const text = document.getElementById('quoteBox').dataset.rawText || '';
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = 'Скопировано!';
+        setTimeout(() => btn.textContent = 'Скопировать', 1500);
+    });
+}
+
+// ---- АДМИНКА ----
+
+let isAdmin = false;
+
+function toggleAdminLogin() {
+    if (isAdmin) return;
+    document.getElementById('adminLoginPanel').classList.toggle('hidden');
+}
+
+function adminLogin() {
+    const pass = document.getElementById('adminPass').value;
+    if (pass === ADMIN_PASSWORD) {
+        isAdmin = true;
+        document.getElementById('adminLoginPanel').classList.add('hidden');
+        document.getElementById('adminPanel').classList.remove('hidden');
+        document.getElementById('adminToggleBtn').textContent = 'Админ';
+        document.getElementById('adminToggleBtn').onclick = null;
+        renderQuoteList();
+    } else {
+        alert('Неверный пароль!');
+    }
+    document.getElementById('adminPass').value = '';
+}
+
+function adminLogout() {
+    isAdmin = false;
+    document.getElementById('adminPanel').classList.add('hidden');
+    document.getElementById('adminToggleBtn').textContent = 'Вход для админа';
+    document.getElementById('adminToggleBtn').onclick = toggleAdminLogin;
+}
+
+function addQuote() {
+    const textarea = document.getElementById('newQuoteText');
+    const text = textarea.value.trim();
+    if (!text) { alert('Введите текст цитаты!'); return; }
+    if (!/\{\d+\}/.test(text)) {
+        if (!confirm('В цитате нет плейсхолдеров вида {1}, {2}. Она будет статичной. Добавить всё равно?')) return;
+    }
+    const userQuotes = getUserQuotes();
+    userQuotes.push(text);
+    saveUserQuotes(userQuotes);
+    textarea.value = '';
+    renderQuoteList();
+}
+
+function deleteQuote(index) {
+    const userQuotes = getUserQuotes();
+    userQuotes.splice(index, 1);
+    saveUserQuotes(userQuotes);
+    renderQuoteList();
+}
+
+function renderQuoteList() {
+    const list = document.getElementById('quoteList');
+    const userQuotes = getUserQuotes();
+    list.innerHTML = '';
+
+    const builtinHeader = document.createElement('p');
+    builtinHeader.style.cssText = 'font-size:.85rem;color:#666;margin-bottom:.3rem';
+    builtinHeader.textContent = `Встроенные цитаты (${BUILTIN_QUOTES.length}) — нельзя удалить:`;
+    list.appendChild(builtinHeader);
+
+    const userHeader = document.createElement('p');
+    userHeader.style.cssText = 'font-size:.85rem;color:#666;margin:.8rem 0 .3rem';
+    userHeader.textContent = `Ваши цитаты (${userQuotes.length}):`;
+    list.appendChild(userHeader);
+
+    if (userQuotes.length === 0) {
+        const empty = document.createElement('p');
+        empty.style.cssText = 'font-size:.8rem;color:#555;font-style:italic';
+        empty.textContent = 'Пока нет добавленных цитат.';
+        list.appendChild(empty);
+    }
+
+    userQuotes.forEach((q, i) => {
+        const item = document.createElement('div');
+        item.className = 'quote-item';
+        const text = document.createElement('div');
+        text.className = 'quote-item-text';
+        text.textContent = q;
+        const del = document.createElement('button');
+        del.className = 'quote-item-del';
+        del.textContent = '✕';
+        del.title = 'Удалить';
+        del.onclick = () => deleteQuote(i);
+        item.appendChild(text);
+        item.appendChild(del);
+        list.appendChild(item);
+    });
+}
+
+// ---- ИНИЦИАЛИЗАЦИЯ ----
+
+document.addEventListener('DOMContentLoaded', () => {
+    createNameField(); createNameField(); createNameField();
+    document.getElementById('namesInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            const names = e.target.value.split(',').map(n => n.trim()).filter(n => n.length > 0);
+            if (names.length > 0) {
+                document.getElementById('nameFields').innerHTML = '';
+                names.forEach(n => createNameField(n));
+                e.target.value = '';
+            }
+        }
+    });
+});
+</script>
+</body>
+</html>
