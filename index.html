@@ -129,7 +129,8 @@ button{font-family:inherit}
 <b>Синтаксис:</b><br>
 <code>{1}</code>, <code>{2}</code> — имена персонажей по порядку.<br>
 <code>{2?сделал|сделала}</code> — гендерный вариант: мужской|женский.<br>
-«Опубликовать» — добавляет цитату в репозиторий, она станет видна всем посетителям.
+«Опубликовать» — добавляет цитату в репозиторий, она станет видна всем посетителям.<br>
+<b>Важно:</b> при каждой генерации имена перемешиваются случайно — кто скажет какую фразу, непредсказуемо.
 </div>
 </div>
 
@@ -142,16 +143,16 @@ button{font-family:inherit}
 <script>
 // ============================================================
 //  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ — версия с записью в GitHub
+//  + случайное перемешивание персонажей
 // ============================================================
 
 // ---- НАСТРОЙКИ ----
 const ADMIN_PASSWORD = 'grim17';
 
-// Данные репозитория — ЗАМЕНИТЕ НА СВОИ
-const GITHUB_OWNER = 'SphinssaCat';       // ← ваш логин GitHub
-const GITHUB_REPO = 'Incorrect_quotes_forfun'; // ← имя репозитория
-const GITHUB_BRANCH = 'main';           // ← ветка (main или master)
-const QUOTES_FILE = 'quotes.json';      // ← имя файла с цитатами
+const GITHUB_OWNER = 'SphinssaCat';
+const GITHUB_REPO = 'Incorrect_quotes_forfun';
+const GITHUB_BRANCH = 'main';
+const QUOTES_FILE = 'quotes.json';
 
 // ---- БАЗОВЫЕ ЦИТАТЫ ----
 const BUILTIN_QUOTES = [
@@ -173,7 +174,12 @@ const BUILTIN_QUOTES = [
     "{1}: Я могу объяснить.\n{2}: Ты всегда можешь объяснить. Проблема в том, что объяснения никогда не бывают хорошими.",
     "{1}: Ты вообще {2?спал|спала} этой ночью?\n{2}: Сон — это для тех, у кого нет нерешённых проблем. А у меня их полно.",
     "{1}: Будь {2?осторожен|осторожна}.\n{2}: Осторожность — это просто страх в красивой обёртке.\n{1}: Иногда осторожность спасает жизнь.\n{2}: А иногда она портит вечер.",
-    "{1}: Ты доверяешь этому человеку?\n{2}: Я доверяю тому, что он будет действовать в своих интересах. Это предсказуемо."
+    "{1}: Ты доверяешь этому человеку?\n{2}: Я доверяю тому, что он будет действовать в своих интересах. Это предсказуемо.",
+    "{1}: Ты уверен, что это сработает?\n{2}: Абсолютно нет. Но разве это когда-нибудь останавливало нас?",
+    "{1}: Я {1?забыл|забыла}, зачем {1?пришёл|пришла}.\n{2}: Ты {2?пришёл|пришла} за мной.\n{1}: Ах да. Я {1?передумал|передумала}.",
+    "{1}: Ты {2?видел|видела}, что {3?сделал|сделала} {3}?\n{2}: Нет, но я {2?слышал|слышала}.\n{3}: Я ничего не {3?делал|делала}.\n{1}: Вот именно.",
+    "{1}: Скажи мне правду.\n{2}: Правда в том, что я не знаю правды.\n{1}: Это не правда. Это отговорка.\n{2}: Хорошо, тогда вот правда: мне лень.",
+    "{1}: Ты {2?готов|готова}?\n{2}: Я {2?родился|родилась} {2?готовым|готовой}.\n{1}: Ты {2?опоздал|опоздала} на два часа.\n{2}: Значит, я {2?родился|родилась} {2?готовым|готовой} с опозданием."
 ];
 
 // ---- ХРАНИЛИЩЕ ----
@@ -213,7 +219,6 @@ function saveToken() {
     localStorage.setItem('github_token', token);
     input.value = '';
 
-    // Проверяем токен — пробуем прочитать файл
     checkToken(token).then(ok => {
         if (ok) {
             status.className = 'token-status ok';
@@ -291,7 +296,6 @@ async function addQuoteToRepo() {
     result.textContent = 'Публикация…';
 
     try {
-        // 1. Читаем текущий файл
         const getUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}?ref=${GITHUB_BRANCH}`;
         const getRes = await fetch(getUrl, {
             headers: {
@@ -305,18 +309,14 @@ async function addQuoteToRepo() {
         const fileData = await getRes.json();
         const sha = fileData.sha;
 
-        // 2. Декодируем содержимое
         const currentContent = JSON.parse(
             atob(fileData.content.replace(/\n/g, ''))
         );
 
-        // 3. Добавляем новую цитату
         currentContent.push(text);
 
-        // 4. Кодируем обратно в base64
         const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(currentContent, null, 2))));
 
-        // 5. Отправляем обновлённый файл
         const putUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}`;
         const putRes = await fetch(putUrl, {
             method: 'PUT',
@@ -338,7 +338,6 @@ async function addQuoteToRepo() {
             throw new Error(errData.message || `HTTP ${putRes.status}`);
         }
 
-        // 6. Обновляем локальный массив
         serverQuotes = currentContent;
         textarea.value = '';
         result.className = 'save-result ok';
@@ -374,8 +373,20 @@ function countNamesNeeded(template) {
     return maxNum;
 }
 
+// Перемешивание массива (алгоритм Фишера-Йетса)
+function shuffleArray(arr) {
+    const result = [...arr];
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+}
+
 function fillTemplate(template, names) {
     let result = template;
+
+    // 1) Гендерные маркеры {N?мужской|женский}
     result = result.replace(/\{(\d+)\?([^}]*)\}/g, (match, num, content) => {
         const pipeIdx = content.indexOf('|');
         if (pipeIdx === -1) return match;
@@ -386,10 +397,15 @@ function fillTemplate(template, names) {
         if (person && person.gender === 'f') return femaleText;
         return maleText;
     });
+
+    // 2) Имена {N}
     for (let i = 0; i < names.length; i++) {
         result = result.split(`{${i+1}}`).join(names[i].name || `Персонаж ${i+1}`);
     }
+
+    // 3) Оставшиеся {N} → "Персонаж N"
     result = result.replace(/\{(\d+)\}/g, (match, num) => `Персонаж ${num}`);
+
     return result;
 }
 
@@ -409,13 +425,17 @@ function generateQuote() {
 
     if (names.length === 0) { alert('Введите хотя бы одно имя!'); return; }
 
+    // Подбираем цитату, которой хватает имён
     let attempts = 0, template;
     do {
         template = all[Math.floor(Math.random() * all.length)];
         attempts++;
     } while (countNamesNeeded(template) > names.length && attempts < 50);
 
-    const filled = fillTemplate(template, names);
+    // ПЕРЕМЕШИВАЕМ имена — кто какой номер получит, теперь случайно
+    const shuffledNames = shuffleArray(names);
+
+    const filled = fillTemplate(template, shuffledNames);
     const quoteBox = document.getElementById('quoteBox');
     quoteBox.innerHTML = filled.split('\n').map(l => `<div class="quote-line">${l}</div>`).join('');
     quoteBox.dataset.rawText = filled;
@@ -486,7 +506,6 @@ function adminLogin() {
         document.getElementById('adminToggleBtn').textContent = 'Админ';
         document.getElementById('adminToggleBtn').onclick = null;
 
-        // Показываем статус токена
         const tokenStatus = document.getElementById('tokenStatus');
         if (getToken()) {
             tokenStatus.className = 'token-status ok';
