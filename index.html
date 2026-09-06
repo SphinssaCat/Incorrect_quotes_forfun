@@ -57,6 +57,14 @@ button{font-family:inherit}
 .status-dot.err{background:#e94560}
 .status-dot.loading{background:#ffa726}
 .status-text{font-size:.8rem;color:#666;margin-bottom:.5rem;text-align:left}
+.token-section{margin-bottom:1rem;padding:.8rem;background:#16213e;border:1px solid #222;border-radius:6px}
+.token-section label{display:block;margin-bottom:.3rem;font-size:.85rem;color:#aaa}
+.token-status{font-size:.8rem;margin-top:.3rem}
+.token-status.ok{color:#4caf50}
+.token-status.err{color:#e94560}
+.save-result{font-size:.8rem;margin-top:.3rem}
+.save-result.ok{color:#4caf50}
+.save-result.err{color:#e94560}
 </style>
 </head>
 <body>
@@ -68,7 +76,7 @@ button{font-family:inherit}
 <p class="subtitle">Подставьте имена — получите хаос</p>
 
 <p id="serverStatus" class="status-text">
-<span class="status-dot loading" id="statusDot"></span><span id="statusText">Загрузка цитат с сервера…</span>
+<span class="status-dot loading" id="statusDot"></span><span id="statusText">Загрузка цитат…</span>
 </p>
 
 <div class="names-section">
@@ -101,15 +109,27 @@ button{font-family:inherit}
 <div id="adminPanel" class="admin-panel hidden">
 <h2>Управление цитатами <span class="badge">admin</span></h2>
 
+<!-- Настройка токена GitHub -->
+<div class="token-section">
+<label for="githubToken">Токен GitHub API (fine-grained):</label>
+<input type="password" id="githubToken" placeholder="github_pat_..." onkeydown="if(event.key==='Enter')saveToken()" />
+<button class="form-btn" onclick="saveToken()">Сохранить токен</button>
+<p class="token-status" id="tokenStatus"></p>
+<p class="admin-info">Токен хранится только в вашем браузере (localStorage) и не попадает в исходный код.<br>
+Создайте fine-grained token с правом <strong>Contents: Read and write</strong> для этого репозитория.<br>
+Настройки GitHub → Developer settings → Personal access tokens → Fine-grained tokens.</p>
+</div>
+
 <div class="add-quote-form">
 <label style="display:block;margin-bottom:.3rem;font-size:.9rem;color:#aaa">Новая цитата:</label>
 <textarea id="newQuoteText" placeholder='{1}: Что делаешь?&#10;{2}: Совершаю ошибку, но с уверенностью.&#10;&#10;Используйте {1}, {2}, {3} для имён.&#10;Для гендерных вариантов: {2?сделал|сделала}&#10;Перенос строки — Enter.'></textarea>
-<button class="form-btn" onclick="addQuote()">Добавить цитату</button>
+<button class="form-btn" onclick="addQuoteToRepo()">Опубликовать цитату</button>
+<p class="save-result" id="saveResult"></p>
 <div class="syntax-help">
 <b>Синтаксис:</b><br>
 <code>{1}</code>, <code>{2}</code> — имена персонажей по порядку.<br>
-<code>{2?сделал|сделала}</code> — гендерный вариант: мужской|женский, зависит от пола персонажа 2.<br>
-Например, если персонаж 2 — женского пола, выведется «сделала».
+<code>{2?сделал|сделала}</code> — гендерный вариант: мужской|женский.<br>
+«Опубликовать» — добавляет цитату в репозиторий, она станет видна всем посетителям.
 </div>
 </div>
 
@@ -121,15 +141,19 @@ button{font-family:inherit}
 
 <script>
 // ============================================================
-//  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ — всё в одном файле
-//  Версия с поддержкой серверной загрузки цитат
+//  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ — версия с записью в GitHub
 // ============================================================
 
-// ---- НАСТРОЙКИ АДМИНА ----
+// ---- НАСТРОЙКИ ----
 const ADMIN_PASSWORD = 'grim17';
 
-// ---- БАЗОВЫЕ ЦИТАТЫ (встроенные, доступны всегда) ----
-// Синтаксис {N?мужской|женский} — выбирает вариант по полу персонажа N
+// Данные репозитория — ЗАМЕНИТЕ НА СВОИ
+const GITHUB_OWNER = 'SphinssaCat;       // ← ваш логин GitHub
+const GITHUB_REPO = 'Incorrect_quotes_forfun; // ← имя репозитория
+const GITHUB_BRANCH = 'main';           // ← ветка (main или master)
+const QUOTES_FILE = 'quotes.json';      // ← имя файла с цитатами
+
+// ---- БАЗОВЫЕ ЦИТАТЫ ----
 const BUILTIN_QUOTES = [
     "{1}: Мы не можем просто уйти отсюда!\n{2}: WATCH ME.",
     "{1}: Что ты делаешь?\n{2}: Совершаю ошибку, но с уверенностью.",
@@ -149,18 +173,12 @@ const BUILTIN_QUOTES = [
     "{1}: Я могу объяснить.\n{2}: Ты всегда можешь объяснить. Проблема в том, что объяснения никогда не бывают хорошими.",
     "{1}: Ты вообще {2?спал|спала} этой ночью?\n{2}: Сон — это для тех, у кого нет нерешённых проблем. А у меня их полно.",
     "{1}: Будь {2?осторожен|осторожна}.\n{2}: Осторожность — это просто страх в красивой обёртке.\n{1}: Иногда осторожность спасает жизнь.\n{2}: А иногда она портит вечер.",
-    "{1}: Ты доверяешь этому человеку?\n{2}: Я доверяю тому, что он будет действовать в своих интересах. Это предсказуемо.",
-    "{1}: Я {1?родился|родилась} для великих дел.\n{2}: И как, {2?родился|родилась}?",
-    "{1}: Ты {2?пришёл|пришла} одна.\n{2}: Во-первых, не одна, а {2?один|одна}. Во-вторых, с тобой.",
-    "{1}: Он {1?ушёл|ушла} и не попрощался.\n{2}: Может, {1?попрощался|попрощалась}, но ты не {2?услышал|услышала}."
+    "{1}: Ты доверяешь этому человеку?\n{2}: Я доверяю тому, что он будет действовать в своих интересах. Это предсказуемо."
 ];
 
 // ---- ХРАНИЛИЩЕ ----
-
-// Цитаты, загруженные с сервера (через /api/quotes)
 let serverQuotes = [];
 
-// Получить цитаты, добавленные пользователем через админку (localStorage)
 function getUserQuotes() {
     try { return JSON.parse(localStorage.getItem('wrong_quotes_user') || '[]'); }
     catch(e) { return []; }
@@ -170,41 +188,168 @@ function saveUserQuotes(arr) {
     localStorage.setItem('wrong_quotes_user', JSON.stringify(arr));
 }
 
-// Все доступные цитаты: встроенные + серверные + пользовательские
 function getAllQuotes() {
     return BUILTIN_QUOTES.concat(serverQuotes, getUserQuotes());
 }
 
-// ---- ЗАГРУЗКА ЦИТАТ С СЕРВЕРА ----
+// ---- ТОКЕН GITHUB ----
+
+function getToken() {
+    return localStorage.getItem('github_token') || '';
+}
+
+function saveToken() {
+    const input = document.getElementById('githubToken');
+    const token = input.value.trim();
+    const status = document.getElementById('tokenStatus');
+
+    if (!token) {
+        localStorage.removeItem('github_token');
+        status.className = 'token-status err';
+        status.textContent = 'Токен удалён.';
+        return;
+    }
+
+    localStorage.setItem('github_token', token);
+    input.value = '';
+
+    // Проверяем токен — пробуем прочитать файл
+    checkToken(token).then(ok => {
+        if (ok) {
+            status.className = 'token-status ok';
+            status.textContent = 'Токен работает! Можно публиковать цитаты.';
+        } else {
+            status.className = 'token-status err';
+            status.textContent = 'Токен не работает. Проверьте права и данные репозитория.';
+        }
+    });
+}
+
+async function checkToken(token) {
+    try {
+        const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}?ref=${GITHUB_BRANCH}`;
+        const res = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/vnd.github+json'
+            }
+        });
+        return res.ok;
+    } catch(e) {
+        return false;
+    }
+}
+
+// ---- ЗАГРУЗКА ЦИТАТ ----
 
 async function loadQuotesFromServer() {
     const dot = document.getElementById('statusDot');
     const text = document.getElementById('statusText');
 
     try {
-        const response = await fetch('/api/quotes');
+        const response = await fetch(QUOTES_FILE);
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const data = await response.json();
 
-        // Проверяем, что получили массив
         if (Array.isArray(data) && data.length > 0) {
             serverQuotes = data;
             dot.className = 'status-dot ok';
-            text.textContent = `Загружено цитат с сервера: ${serverQuotes.length}. Всего доступно: ${getAllQuotes().length}`;
+            text.textContent = `Загружено цитат: ${serverQuotes.length}. Всего доступно: ${getAllQuotes().length}`;
         } else {
             dot.className = 'status-dot ok';
-            text.textContent = `Сервер доступен, но дополнительных цитат нет. Используются встроенные (${BUILTIN_QUOTES.length}).`;
+            text.textContent = `Файл найден. Всего доступно: ${BUILTIN_QUOTES.length} встроенных цитат.`;
         }
     } catch (e) {
-        console.log('Не удалось загрузить цитаты с сервера:', e);
         serverQuotes = [];
-
         dot.className = 'status-dot err';
-        text.textContent = `Сервер недоступен — используются встроенные цитаты (${BUILTIN_QUOTES.length}).`;
+        text.textContent = `Файл ${QUOTES_FILE} не найден — используются встроенные (${BUILTIN_QUOTES.length}).`;
+    }
+}
+
+// ---- ЗАПИСЬ ЦИТАТЫ В РЕПОЗИТОРИЙ ----
+
+async function addQuoteToRepo() {
+    const textarea = document.getElementById('newQuoteText');
+    const result = document.getElementById('saveResult');
+    const text = textarea.value.trim();
+
+    if (!text) { alert('Введите текст цитаты!'); return; }
+    if (!/\{\d+\}/.test(text)) {
+        if (!confirm('В цитате нет плейсхолдеров вида {1}, {2}. Она будет статичной. Добавить всё равно?')) return;
+    }
+
+    const token = getToken();
+    if (!token) {
+        result.className = 'save-result err';
+        result.textContent = 'Сначала сохраните токен GitHub в поле выше.';
+        return;
+    }
+
+    result.className = 'save-result';
+    result.textContent = 'Публикация…';
+
+    try {
+        // 1. Читаем текущий файл
+        const getUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}?ref=${GITHUB_BRANCH}`;
+        const getRes = await fetch(getUrl, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/vnd.github+json'
+            }
+        });
+
+        if (!getRes.ok) throw new Error(`Не удалось прочитать файл (HTTP ${getRes.status})`);
+
+        const fileData = await getRes.json();
+        const sha = fileData.sha;
+
+        // 2. Декодируем содержимое
+        const currentContent = JSON.parse(
+            atob(fileData.content.replace(/\n/g, ''))
+        );
+
+        // 3. Добавляем новую цитату
+        currentContent.push(text);
+
+        // 4. Кодируем обратно в base64
+        const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(currentContent, null, 2))));
+
+        // 5. Отправляем обновлённый файл
+        const putUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${QUOTES_FILE}`;
+        const putRes = await fetch(putUrl, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: `Добавлена новая цитата`,
+                content: newContent,
+                sha: sha,
+                branch: GITHUB_BRANCH
+            })
+        });
+
+        if (!putRes.ok) {
+            const errData = await putRes.json().catch(() => ({}));
+            throw new Error(errData.message || `HTTP ${putRes.status}`);
+        }
+
+        // 6. Обновляем локальный массив
+        serverQuotes = currentContent;
+        textarea.value = '';
+        result.className = 'save-result ok';
+        result.textContent = 'Цитата опубликована! Она появится у всех посетителей через пару минут.';
+
+        renderQuoteList();
+        loadQuotesFromServer();
+
+    } catch (e) {
+        result.className = 'save-result err';
+        result.textContent = 'Ошибка: ' + e.message;
     }
 }
 
@@ -231,8 +376,6 @@ function countNamesNeeded(template) {
 
 function fillTemplate(template, names) {
     let result = template;
-
-    // 1) Гендерные маркеры {N?мужской|женский}
     result = result.replace(/\{(\d+)\?([^}]*)\}/g, (match, num, content) => {
         const pipeIdx = content.indexOf('|');
         if (pipeIdx === -1) return match;
@@ -240,20 +383,13 @@ function fillTemplate(template, names) {
         const femaleText = content.substring(pipeIdx + 1);
         const idx = parseInt(num) - 1;
         const person = names[idx];
-        if (person && person.gender === 'f') {
-            return femaleText;
-        }
+        if (person && person.gender === 'f') return femaleText;
         return maleText;
     });
-
-    // 2) Имена {N}
     for (let i = 0; i < names.length; i++) {
         result = result.split(`{${i+1}}`).join(names[i].name || `Персонаж ${i+1}`);
     }
-
-    // 3) Оставшиеся {N} → "Персонаж N"
     result = result.replace(/\{(\d+)\}/g, (match, num) => `Персонаж ${num}`);
-
     return result;
 }
 
@@ -349,6 +485,17 @@ function adminLogin() {
         document.getElementById('adminPanel').classList.remove('hidden');
         document.getElementById('adminToggleBtn').textContent = 'Админ';
         document.getElementById('adminToggleBtn').onclick = null;
+
+        // Показываем статус токена
+        const tokenStatus = document.getElementById('tokenStatus');
+        if (getToken()) {
+            tokenStatus.className = 'token-status ok';
+            tokenStatus.textContent = 'Токен уже сохранён. Можно публиковать цитаты.';
+        } else {
+            tokenStatus.className = 'token-status err';
+            tokenStatus.textContent = 'Токен не задан. Введите его в поле выше, чтобы публиковать цитаты.';
+        }
+
         renderQuoteList();
     } else {
         alert('Неверный пароль!');
@@ -363,74 +510,31 @@ function adminLogout() {
     document.getElementById('adminToggleBtn').onclick = toggleAdminLogin;
 }
 
-function addQuote() {
-    const textarea = document.getElementById('newQuoteText');
-    const text = textarea.value.trim();
-    if (!text) { alert('Введите текст цитаты!'); return; }
-    if (!/\{\d+\}/.test(text)) {
-        if (!confirm('В цитате нет плейсхолдеров вида {1}, {2}. Она будет статичной. Добавить всё равно?')) return;
-    }
-    const userQuotes = getUserQuotes();
-    userQuotes.push(text);
-    saveUserQuotes(userQuotes);
-    textarea.value = '';
-    renderQuoteList();
-}
-
-function deleteQuote(index) {
-    const userQuotes = getUserQuotes();
-    userQuotes.splice(index, 1);
-    saveUserQuotes(userQuotes);
-    renderQuoteList();
-}
-
 function renderQuoteList() {
     const list = document.getElementById('quoteList');
-    const userQuotes = getUserQuotes();
     list.innerHTML = '';
 
-    // Блок: встроенные
     const builtinHeader = document.createElement('p');
     builtinHeader.style.cssText = 'font-size:.85rem;color:#666;margin-bottom:.3rem';
     builtinHeader.textContent = `Встроенные (${BUILTIN_QUOTES.length}) — нельзя удалить:`;
     list.appendChild(builtinHeader);
 
-    // Блок: серверные
     if (serverQuotes.length > 0) {
         const serverHeader = document.createElement('p');
         serverHeader.style.cssText = 'font-size:.85rem;color:#666;margin:.8rem 0 .3rem';
-        serverHeader.textContent = `С сервера (${serverQuotes.length}) — нельзя удалить:`;
+        serverHeader.textContent = `Опубликованные (${serverQuotes.length}) — в репозитории:`;
         list.appendChild(serverHeader);
+
+        serverQuotes.forEach((q, i) => {
+            const item = document.createElement('div');
+            item.className = 'quote-item';
+            const text = document.createElement('div');
+            text.className = 'quote-item-text';
+            text.textContent = q;
+            item.appendChild(text);
+            list.appendChild(item);
+        });
     }
-
-    // Блок: пользовательские
-    const userHeader = document.createElement('p');
-    userHeader.style.cssText = 'font-size:.85rem;color:#666;margin:.8rem 0 .3rem';
-    userHeader.textContent = `Ваши цитаты (${userQuotes.length}):`;
-    list.appendChild(userHeader);
-
-    if (userQuotes.length === 0) {
-        const empty = document.createElement('p');
-        empty.style.cssText = 'font-size:.8rem;color:#555;font-style:italic';
-        empty.textContent = 'Пока нет добавленных цитат.';
-        list.appendChild(empty);
-    }
-
-    userQuotes.forEach((q, i) => {
-        const item = document.createElement('div');
-        item.className = 'quote-item';
-        const text = document.createElement('div');
-        text.className = 'quote-item-text';
-        text.textContent = q;
-        const del = document.createElement('button');
-        del.className = 'quote-item-del';
-        del.textContent = '✕';
-        del.title = 'Удалить';
-        del.onclick = () => deleteQuote(i);
-        item.appendChild(text);
-        item.appendChild(del);
-        list.appendChild(item);
-    });
 }
 
 // ---- ИНИЦИАЛИЗАЦИЯ ----
