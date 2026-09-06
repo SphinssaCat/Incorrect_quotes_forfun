@@ -12,14 +12,15 @@ h1{font-size:1.8rem;margin-bottom:.3rem;color:#f5f5f5}
 .subtitle{color:#888;margin-bottom:1.5rem;font-size:.95rem}
 .names-section{margin-bottom:1rem}
 .names-section label{display:block;margin-bottom:.4rem;font-size:.9rem;color:#aaa}
-input[type=text],input[type=password],textarea{width:100%;padding:.6rem .8rem;border:1px solid #333;border-radius:6px;background:#0f0f23;color:#e0e0e0;font-size:1rem;margin-bottom:.5rem;font-family:inherit}
+input[type=text],input[type=password],textarea,select{width:100%;padding:.6rem .8rem;border:1px solid #333;border-radius:6px;background:#0f0f23;color:#e0e0e0;font-size:1rem;margin-bottom:.5rem;font-family:inherit}
 input[type=text]::placeholder,input[type=password]::placeholder{color:#555}
-input[type=text]:focus,input[type=password]:focus,textarea:focus{outline:none;border-color:#e94560}
+input[type=text]:focus,input[type=password]:focus,textarea:focus,select:focus{outline:none;border-color:#e94560}
 textarea{resize:vertical;min-height:80px;line-height:1.5}
 .name-fields{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem}
-.name-field-row{display:flex;gap:.5rem}
-.name-field-row input{margin-bottom:0}
-.remove-btn{background:#e94560;color:#fff;border:none;border-radius:6px;padding:0 .8rem;cursor:pointer;font-size:1.1rem;white-space:nowrap}
+.name-field-row{display:flex;gap:.5rem;align-items:center}
+.name-field-row input{margin-bottom:0;flex:1}
+.gender-select{width:auto!important;min-width:55px;margin-bottom:0;padding:.6rem .4rem;cursor:pointer;text-align:center}
+.remove-btn{background:#e94560;color:#fff;border:none;border-radius:6px;padding:0 .8rem;cursor:pointer;font-size:1.1rem;white-space:nowrap;height:36px}
 .remove-btn:hover{background:#c81e45}
 #addNameBtn{background:transparent;border:1px dashed #444;color:#888;padding:.4rem 1rem;border-radius:6px;cursor:pointer;font-size:.85rem}
 #addNameBtn:hover{border-color:#e94560;color:#e94560}
@@ -48,6 +49,14 @@ button{font-family:inherit}
 .form-btn{background:#e94560;color:#fff;border:none}
 .form-btn:hover{background:#c81e45;color:#fff}
 .badge{display:inline-block;background:#e94560;color:#fff;font-size:.7rem;padding:.15rem .5rem;border-radius:4px;margin-left:.5rem;vertical-align:middle}
+.hint{font-size:.75rem;color:#666;margin-top:.3rem;line-height:1.4}
+.syntax-help{font-size:.78rem;color:#888;background:#16213e;border:1px solid #222;border-radius:6px;padding:.6rem .8rem;margin-top:.5rem;line-height:1.5}
+.syntax-help code{background:#0f0f23;padding:.1rem .3rem;border-radius:3px;color:#e94560}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:.3rem;vertical-align:middle}
+.status-dot.ok{background:#4caf50}
+.status-dot.err{background:#e94560}
+.status-dot.loading{background:#ffa726}
+.status-text{font-size:.8rem;color:#666;margin-bottom:.5rem;text-align:left}
 </style>
 </head>
 <body>
@@ -58,9 +67,14 @@ button{font-family:inherit}
 <h1>Генератор неправильных цитат</h1>
 <p class="subtitle">Подставьте имена — получите хаос</p>
 
+<p id="serverStatus" class="status-text">
+<span class="status-dot loading" id="statusDot"></span><span id="statusText">Загрузка цитат с сервера…</span>
+</p>
+
 <div class="names-section">
 <label for="namesInput">Имена персонажей (через запятую):</label>
 <input type="text" id="namesInput" placeholder="Анна, Борис, Вера" />
+<p class="hint">Введите имена через запятую и нажмите Enter — или добавьте поля по одному. У каждого имени можно выбрать пол (М/Ж).</p>
 <button id="addNameBtn" onclick="createNameField()">Добавить поле</button>
 </div>
 
@@ -89,8 +103,14 @@ button{font-family:inherit}
 
 <div class="add-quote-form">
 <label style="display:block;margin-bottom:.3rem;font-size:.9rem;color:#aaa">Новая цитата:</label>
-<textarea id="newQuoteText" placeholder='{1}: Что делаешь?&#10;{2}: Совершаю ошибку, но с уверенностью.&#10;&#10;Используйте {1}, {2}, {3} для имён и перенос строки (Enter) для новых реплик.'></textarea>
+<textarea id="newQuoteText" placeholder='{1}: Что делаешь?&#10;{2}: Совершаю ошибку, но с уверенностью.&#10;&#10;Используйте {1}, {2}, {3} для имён.&#10;Для гендерных вариантов: {2?сделал|сделала}&#10;Перенос строки — Enter.'></textarea>
 <button class="form-btn" onclick="addQuote()">Добавить цитату</button>
+<div class="syntax-help">
+<b>Синтаксис:</b><br>
+<code>{1}</code>, <code>{2}</code> — имена персонажей по порядку.<br>
+<code>{2?сделал|сделала}</code> — гендерный вариант: мужской|женский, зависит от пола персонажа 2.<br>
+Например, если персонаж 2 — женского пола, выведется «сделала».
+</div>
 </div>
 
 <div class="quote-list" id="quoteList"></div>
@@ -102,39 +122,45 @@ button{font-family:inherit}
 <script>
 // ============================================================
 //  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ — всё в одном файле
+//  Версия с поддержкой серверной загрузки цитат
 // ============================================================
 
 // ---- НАСТРОЙКИ АДМИНА ----
-// Смените пароль на свой перед публикацией!
 const ADMIN_PASSWORD = 'grim17';
 
-// ---- БАЗОВЫЕ ЦИТАТЫ (встроенные) ----
+// ---- БАЗОВЫЕ ЦИТАТЫ (встроенные, доступны всегда) ----
+// Синтаксис {N?мужской|женский} — выбирает вариант по полу персонажа N
 const BUILTIN_QUOTES = [
     "{1}: Мы не можем просто уйти отсюда!\n{2}: WATCH ME.",
     "{1}: Что ты делаешь?\n{2}: Совершаю ошибку, но с уверенностью.",
     "{1}: У тебя есть план?\n{2}: План — это просто список того, что не сработает. У меня есть идея.",
-    "{1}: Я не могу поверить, что ты это сделал.\n{2}: Я тоже не могу. Поэтому перепроверь, точно ли это был я.",
+    "{1}: Я не могу поверить, что ты это {2?сделал|сделала}.\n{2}: Я тоже не могу. Поэтому перепроверь, точно ли это {2?был|была} я.",
     "{1}: Объясни мне это так, будто мне пять лет.\n{2}: Ладно. Тебе пять лет. Тебе нельзя это знать.",
-    "{1}: Ты опять всё испортил.\n{2}: Я не испортил. Я улучшил в неожиданном направлении.",
+    "{1}: Ты опять всё {2?испортил|испортила}.\n{2}: Я не {2?испортил|испортила}. Я {2?улучшил|улучшила} в неожиданном направлении.",
     "{1}: Как думаешь, что пойдёт не так?\n{2}: Всё. Но по-разному, и это уже интересно.",
-    "{1}: Ты только что выпил чужой кофе?\n{2}: Нет. Я выпил СВОЙ кофе. Просто он оказался в чужой чашке.",
+    "{1}: Ты только что {2?выпил|выпила} чужой кофе?\n{2}: Нет. Я {2?выпил|выпила} СВОЙ кофе. Просто он оказался в чужой чашке.",
     "{1}: Это плохая идея.\n{2}: Все лучшие идеи начинаются с этой фразы.",
-    "{1}: Ты же понимаешь, что это незаконно?\n{2}: Незаконно — это слишком сильное слово. Я бы сказал «не поощряется».",
+    "{1}: Ты же понимаешь, что это незаконно?\n{2}: Незаконно — это слишком сильное слово. Я бы {2?сказал|сказала} «не поощряется».",
     "{1}: Сколько тебе нужно времени?\n{2}: Двадцать минут.\n{1}: У тебя пять.\n{2}: Тогда мне пять.",
     "{1}: Почему у тебя на лице такое выражение?\n{2}: Это моё лицо. Оно всегда такое.\n{1}: Нет, обычно оно хуже.\n{2}: О, спасибо.",
-    "{1}: Я приготовил ужин.\n{2}: Почему в духовке огонь?\n{1}: Это для атмосферы.",
-    "{1}: Ты обещал, что больше так не будешь.\n{2}: Я обещал, что постараюсь. Это разные вещи.\n{3}: Вы оба плохо знаете этого человека.",
+    "{1}: Я {1?приготовил|приготовила} ужин.\n{2}: Почему в духовке огонь?\n{1}: Это для атмосферы.",
+    "{1}: Ты {2?обещал|обещала}, что больше так не будешь.\n{2}: Я {2?обещал|обещала}, что постараюсь. Это разные вещи.\n{3}: Вы оба плохо знаете этого человека.",
     "{1}: Что самое худшее, что может случиться?\n{2}: Ты серьёзно? Каждый раз, когда кто-то говорит эту фразу, что-то случается.\n{1}: Ну, это просто совпадение...\n*раздаётся взрыв*",
     "{1}: Я могу объяснить.\n{2}: Ты всегда можешь объяснить. Проблема в том, что объяснения никогда не бывают хорошими.",
-    "{1}: Ты вообще спал этой ночью?\n{2}: Сон — это для тех, у кого нет нерешённых проблем. А у меня их полно.",
-    "{1}: Будь осторожен.\n{2}: Осторожность — это просто страх в красивой обёртке.\n{1}: Иногда осторожность спасает жизнь.\n{2}: А иногда она портит вечер.",
-    "{1}: Ты доверяешь этому человеку?\n{2}: Я доверяю тому, что он будет действовать в своих интересах. Это предсказуемо."
+    "{1}: Ты вообще {2?спал|спала} этой ночью?\n{2}: Сон — это для тех, у кого нет нерешённых проблем. А у меня их полно.",
+    "{1}: Будь {2?осторожен|осторожна}.\n{2}: Осторожность — это просто страх в красивой обёртке.\n{1}: Иногда осторожность спасает жизнь.\n{2}: А иногда она портит вечер.",
+    "{1}: Ты доверяешь этому человеку?\n{2}: Я доверяю тому, что он будет действовать в своих интересах. Это предсказуемо.",
+    "{1}: Я {1?родился|родилась} для великих дел.\n{2}: И как, {2?родился|родилась}?",
+    "{1}: Ты {2?пришёл|пришла} одна.\n{2}: Во-первых, не одна, а {2?один|одна}. Во-вторых, с тобой.",
+    "{1}: Он {1?ушёл|ушла} и не попрощался.\n{2}: Может, {1?попрощался|попрощалась}, но ты не {2?услышал|услышала}."
 ];
 
 // ---- ХРАНИЛИЩЕ ----
-// Пользовательские цитаты хранятся в localStorage браузера.
-// Базовые цитаты всегда подгружаются из кода.
 
+// Цитаты, загруженные с сервера (через /api/quotes)
+let serverQuotes = [];
+
+// Получить цитаты, добавленные пользователем через админку (localStorage)
 function getUserQuotes() {
     try { return JSON.parse(localStorage.getItem('wrong_quotes_user') || '[]'); }
     catch(e) { return []; }
@@ -144,33 +170,107 @@ function saveUserQuotes(arr) {
     localStorage.setItem('wrong_quotes_user', JSON.stringify(arr));
 }
 
+// Все доступные цитаты: встроенные + серверные + пользовательские
 function getAllQuotes() {
-    return BUILTIN_QUOTES.concat(getUserQuotes());
+    return BUILTIN_QUOTES.concat(serverQuotes, getUserQuotes());
+}
+
+// ---- ЗАГРУЗКА ЦИТАТ С СЕРВЕРА ----
+
+async function loadQuotesFromServer() {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+
+    try {
+        const response = await fetch('/api/quotes');
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Проверяем, что получили массив
+        if (Array.isArray(data) && data.length > 0) {
+            serverQuotes = data;
+            dot.className = 'status-dot ok';
+            text.textContent = `Загружено цитат с сервера: ${serverQuotes.length}. Всего доступно: ${getAllQuotes().length}`;
+        } else {
+            dot.className = 'status-dot ok';
+            text.textContent = `Сервер доступен, но дополнительных цитат нет. Используются встроенные (${BUILTIN_QUOTES.length}).`;
+        }
+    } catch (e) {
+        console.log('Не удалось загрузить цитаты с сервера:', e);
+        serverQuotes = [];
+
+        dot.className = 'status-dot err';
+        text.textContent = `Сервер недоступен — используются встроенные цитаты (${BUILTIN_QUOTES.length}).`;
+    }
 }
 
 // ---- ЛОГИКА ГЕНЕРАЦИИ ----
 
 function countNamesNeeded(template) {
-    const matches = template.match(/\{(\d+)\}/g);
-    if (!matches) return 1;
-    return Math.max(...matches.map(m => parseInt(m.replace(/[{}]/g, ''))));
+    let maxNum = 1;
+    const nameMatches = template.match(/\{(\d+)\}/g);
+    if (nameMatches) {
+        nameMatches.forEach(m => {
+            const num = parseInt(m.replace(/[{}]/g, ''));
+            if (num > maxNum) maxNum = num;
+        });
+    }
+    const genderMatches = template.match(/\{(\d+)\?[^}]*\}/g);
+    if (genderMatches) {
+        genderMatches.forEach(m => {
+            const num = parseInt(m.match(/\{(\d+)\?/)[1]);
+            if (num > maxNum) maxNum = num;
+        });
+    }
+    return maxNum;
 }
 
 function fillTemplate(template, names) {
     let result = template;
+
+    // 1) Гендерные маркеры {N?мужской|женский}
+    result = result.replace(/\{(\d+)\?([^}]*)\}/g, (match, num, content) => {
+        const pipeIdx = content.indexOf('|');
+        if (pipeIdx === -1) return match;
+        const maleText = content.substring(0, pipeIdx);
+        const femaleText = content.substring(pipeIdx + 1);
+        const idx = parseInt(num) - 1;
+        const person = names[idx];
+        if (person && person.gender === 'f') {
+            return femaleText;
+        }
+        return maleText;
+    });
+
+    // 2) Имена {N}
     for (let i = 0; i < names.length; i++) {
-        result = result.split(`{${i+1}}`).join(names[i] || `Персонаж ${i+1}`);
+        result = result.split(`{${i+1}}`).join(names[i].name || `Персонаж ${i+1}`);
     }
-    // Заменяем оставшиеся плейсхолдеры, для которых не хватило имён
+
+    // 3) Оставшиеся {N} → "Персонаж N"
     result = result.replace(/\{(\d+)\}/g, (match, num) => `Персонаж ${num}`);
+
     return result;
 }
 
 function generateQuote() {
     const all = getAllQuotes();
     if (all.length === 0) { alert('Цитаты не найдены!'); return; }
-    const nameFields = document.querySelectorAll('.name-field-input');
-    const names = Array.from(nameFields).map(i => i.value.trim()).filter(n => n.length > 0);
+
+    const rows = document.querySelectorAll('.name-field-row');
+    const names = Array.from(rows).map(row => {
+        const nameInput = row.querySelector('.name-field-input');
+        const genderSelect = row.querySelector('.gender-select');
+        return {
+            name: nameInput.value.trim(),
+            gender: genderSelect ? genderSelect.value : 'm'
+        };
+    }).filter(n => n.name.length > 0);
+
     if (names.length === 0) { alert('Введите хотя бы одно имя!'); return; }
 
     let attempts = 0, template;
@@ -188,20 +288,29 @@ function generateQuote() {
 
 // ---- УПРАВЛЕНИЕ ИМЕНАМИ ----
 
-function createNameField(value = '') {
+function createNameField(value = '', gender = 'm') {
     const container = document.getElementById('nameFields');
     const row = document.createElement('div');
     row.className = 'name-field-row';
+
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'name-field-input';
     input.placeholder = `Имя ${container.children.length + 1}`;
     input.value = value;
+
+    const genderSelect = document.createElement('select');
+    genderSelect.className = 'gender-select';
+    genderSelect.innerHTML = '<option value="m">М</option><option value="f">Ж</option>';
+    genderSelect.value = gender;
+
     const btn = document.createElement('button');
     btn.className = 'remove-btn';
     btn.textContent = '×';
     btn.onclick = () => { row.remove(); updatePlaceholders(); };
+
     row.appendChild(input);
+    row.appendChild(genderSelect);
     row.appendChild(btn);
     container.appendChild(row);
 }
@@ -280,11 +389,21 @@ function renderQuoteList() {
     const userQuotes = getUserQuotes();
     list.innerHTML = '';
 
+    // Блок: встроенные
     const builtinHeader = document.createElement('p');
     builtinHeader.style.cssText = 'font-size:.85rem;color:#666;margin-bottom:.3rem';
-    builtinHeader.textContent = `Встроенные цитаты (${BUILTIN_QUOTES.length}) — нельзя удалить:`;
+    builtinHeader.textContent = `Встроенные (${BUILTIN_QUOTES.length}) — нельзя удалить:`;
     list.appendChild(builtinHeader);
 
+    // Блок: серверные
+    if (serverQuotes.length > 0) {
+        const serverHeader = document.createElement('p');
+        serverHeader.style.cssText = 'font-size:.85rem;color:#666;margin:.8rem 0 .3rem';
+        serverHeader.textContent = `С сервера (${serverQuotes.length}) — нельзя удалить:`;
+        list.appendChild(serverHeader);
+    }
+
+    // Блок: пользовательские
     const userHeader = document.createElement('p');
     userHeader.style.cssText = 'font-size:.85rem;color:#666;margin:.8rem 0 .3rem';
     userHeader.textContent = `Ваши цитаты (${userQuotes.length}):`;
@@ -317,13 +436,14 @@ function renderQuoteList() {
 // ---- ИНИЦИАЛИЗАЦИЯ ----
 
 document.addEventListener('DOMContentLoaded', () => {
+    loadQuotesFromServer();
     createNameField(); createNameField(); createNameField();
     document.getElementById('namesInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') {
             const names = e.target.value.split(',').map(n => n.trim()).filter(n => n.length > 0);
             if (names.length > 0) {
                 document.getElementById('nameFields').innerHTML = '';
-                names.forEach(n => createNameField(n));
+                names.forEach(n => createNameField(n, 'm'));
                 e.target.value = '';
             }
         }
