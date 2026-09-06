@@ -16,6 +16,9 @@ input[type=text],input[type=password],textarea,select{width:100%;padding:.6rem .
 input[type=text]::placeholder,input[type=password]::placeholder{color:#555}
 input[type=text]:focus,input[type=password]:focus,textarea:focus,select:focus{outline:none;border-color:#e94560}
 textarea{resize:vertical;min-height:80px;line-height:1.5}
+.count-section{margin-bottom:1rem}
+.count-section label{display:block;margin-bottom:.4rem;font-size:.9rem;color:#aaa}
+#charCount{width:auto;min-width:80px;cursor:pointer}
 .name-fields{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem}
 .name-field-row{display:flex;gap:.5rem;align-items:center}
 .name-field-row input{margin-bottom:0;flex:1}
@@ -65,6 +68,7 @@ button{font-family:inherit}
 .save-result{font-size:.8rem;margin-top:.3rem}
 .save-result.ok{color:#4caf50}
 .save-result.err{color:#e94560}
+.no-quotes-msg{color:#ffa726;font-size:.9rem;margin-top:.5rem}
 </style>
 </head>
 <body>
@@ -79,16 +83,29 @@ button{font-family:inherit}
 <span class="status-dot loading" id="statusDot"></span><span id="statusText">Загрузка цитат…</span>
 </p>
 
+<!-- Выбор количества персонажей -->
+<div class="count-section">
+<label for="charCount">Количество персонажей:</label>
+<select id="charCount" onchange="updateNameFields()">
+<option value="1">1 персонаж</option>
+<option value="2" selected>2 персонажа</option>
+<option value="3">3 персонажа</option>
+<option value="4">4 персонажа</option>
+<option value="5">5 персонажей</option>
+</select>
+</div>
+
 <div class="names-section">
 <label for="namesInput">Имена персонажей (через запятую):</label>
 <input type="text" id="namesInput" placeholder="Анна, Борис, Вера" />
-<p class="hint">Введите имена через запятую и нажмите Enter — или добавьте поля по одному. У каждого имени можно выбрать пол (М/Ж).</p>
-<button id="addNameBtn" onclick="createNameField()">Добавить поле</button>
+<p class="hint">Введите имена через запятую и нажмите Enter — или заполните поля вручную. У каждого имени можно выбрать пол (М/Ж).</p>
+<button id="addNameBtn" onclick="addExtraField()">Добавить поле</button>
 </div>
 
 <div id="nameFields" class="name-fields"></div>
 
 <button id="generateBtn" onclick="generateQuote()">Сгенерировать цитату</button>
+<p class="no-quotes-msg hidden" id="noQuotesMsg"></p>
 
 <div id="quoteBox" class="quote-box">
 <p class="placeholder-text">Нажмите «Сгенерировать», чтобы получить цитату</p>
@@ -129,8 +146,7 @@ button{font-family:inherit}
 <b>Синтаксис:</b><br>
 <code>{1}</code>, <code>{2}</code> — имена персонажей по порядку.<br>
 <code>{2?сделал|сделала}</code> — гендерный вариант: мужской|женский.<br>
-«Опубликовать» — добавляет цитату в репозиторий, она станет видна всем посетителям.<br>
-<b>Важно:</b> при каждой генерации имена перемешиваются случайно — кто скажет какую фразу, непредсказуемо.
+<b>Важно:</b> число плейсхолдеров в цитате должно совпадать с выбранным количеством персонажей. Цитата с <code>{1}</code> и <code>{2}</code> — это 2 персонажа, с <code>{1}</code>, <code>{2}</code>, <code>{3}</code> — 3.
 </div>
 </div>
 
@@ -142,8 +158,10 @@ button{font-family:inherit}
 
 <script>
 // ============================================================
-//  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ — версия с записью в GitHub
-//  + случайное перемешивание персонажей
+//  ГЕНЕРАТОР НЕПРАВИЛЬНЫХ ЦИТАТ
+//  + выбор количества персонажей
+//  + случайное перемешивание
+//  + запись в GitHub
 // ============================================================
 
 // ---- НАСТРОЙКИ ----
@@ -155,7 +173,14 @@ const GITHUB_BRANCH = 'main';
 const QUOTES_FILE = 'quotes.json';
 
 // ---- БАЗОВЫЕ ЦИТАТЫ ----
+// Количество плейсхолдеров определяет, скольким персонажам подходит цитата
 const BUILTIN_QUOTES = [
+    // === 1 персонаж ===
+    "{1}: Я {1?разговаривал|разговаривала} сам{1?__|а} с собой. Нормально, я {1?согласен|согласна} с собой.",
+    "{1}: Если бы я {1?мог|могла}, я бы {1?спал|спала} вечно. Но потом кто-то {1?придумал|придумала} понедельник.",
+    "{1}: Я {1?решил|решила}, что моя жизнь — это комедия. По крайней мере, над ней смеются.",
+
+    // === 2 персонажа ===
     "{1}: Мы не можем просто уйти отсюда!\n{2}: WATCH ME.",
     "{1}: Что ты делаешь?\n{2}: Совершаю ошибку, но с уверенностью.",
     "{1}: У тебя есть план?\n{2}: План — это просто список того, что не сработает. У меня есть идея.",
@@ -169,7 +194,6 @@ const BUILTIN_QUOTES = [
     "{1}: Сколько тебе нужно времени?\n{2}: Двадцать минут.\n{1}: У тебя пять.\n{2}: Тогда мне пять.",
     "{1}: Почему у тебя на лице такое выражение?\n{2}: Это моё лицо. Оно всегда такое.\n{1}: Нет, обычно оно хуже.\n{2}: О, спасибо.",
     "{1}: Я {1?приготовил|приготовила} ужин.\n{2}: Почему в духовке огонь?\n{1}: Это для атмосферы.",
-    "{1}: Ты {2?обещал|обещала}, что больше так не будешь.\n{2}: Я {2?обещал|обещала}, что постараюсь. Это разные вещи.\n{3}: Вы оба плохо знаете этого человека.",
     "{1}: Что самое худшее, что может случиться?\n{2}: Ты серьёзно? Каждый раз, когда кто-то говорит эту фразу, что-то случается.\n{1}: Ну, это просто совпадение...\n*раздаётся взрыв*",
     "{1}: Я могу объяснить.\n{2}: Ты всегда можешь объяснить. Проблема в том, что объяснения никогда не бывают хорошими.",
     "{1}: Ты вообще {2?спал|спала} этой ночью?\n{2}: Сон — это для тех, у кого нет нерешённых проблем. А у меня их полно.",
@@ -177,9 +201,22 @@ const BUILTIN_QUOTES = [
     "{1}: Ты доверяешь этому человеку?\n{2}: Я доверяю тому, что он будет действовать в своих интересах. Это предсказуемо.",
     "{1}: Ты уверен, что это сработает?\n{2}: Абсолютно нет. Но разве это когда-нибудь останавливало нас?",
     "{1}: Я {1?забыл|забыла}, зачем {1?пришёл|пришла}.\n{2}: Ты {2?пришёл|пришла} за мной.\n{1}: Ах да. Я {1?передумал|передумала}.",
-    "{1}: Ты {2?видел|видела}, что {3?сделал|сделала} {3}?\n{2}: Нет, но я {2?слышал|слышала}.\n{3}: Я ничего не {3?делал|делала}.\n{1}: Вот именно.",
     "{1}: Скажи мне правду.\n{2}: Правда в том, что я не знаю правды.\n{1}: Это не правда. Это отговорка.\n{2}: Хорошо, тогда вот правда: мне лень.",
-    "{1}: Ты {2?готов|готова}?\n{2}: Я {2?родился|родилась} {2?готовым|готовой}.\n{1}: Ты {2?опоздал|опоздала} на два часа.\n{2}: Значит, я {2?родился|родилась} {2?готовым|готовой} с опозданием."
+    "{1}: Ты {2?готов|готова}?\n{2}: Я {2?родился|родилась} {2?готовым|готовой}.\n{1}: Ты {2?опоздал|опоздала} на два часа.\n{2}: Значит, я {2?родился|родилась} {2?готовым|готовой} с опозданием.",
+
+    // === 3 персонажа ===
+    "{1}: Ты {2?обещал|обещала}, что больше так не будешь.\n{2}: Я {2?обещал|обещала}, что постараюсь. Это разные вещи.\n{3}: Вы оба плохо знаете этого человека.",
+    "{1}: Ты {2?видел|видела}, что {3?сделал|сделала} {3}?\n{2}: Нет, но я {2?слышал|слышала}.\n{3}: Я ничего не {3?делал|делала}.\n{1}: Вот именно.",
+    "{1}: Нам нужен план.\n{2}: У меня есть план.\n{3}: Последний раз, когда у тебя был план, мы {2?потеряли|потеряли} ключи от машины.\n{2}: Но мы их {2?нашли|нашли}!\n{3}: В канаве.\n{1}: Это было один раз!\n{3}: Нет, это было два раза.",
+    "{1}: Кто {2?взял|взяла} последний кусок пиццы?\n{2}: Это {3?был|была} не я.\n{3}: Я {3?видел|видела}, как {2} {2?ел|ела}.\n{2}: Предатель.",
+    "{1}: Я {1?нашёл|нашла} способ решить все наши проблемы.\n{2}: Звучит опасно.\n{3}: Звучит как способ создать новые, более крупные проблемы.\n{1}: ...большого размера.\n{3}: Именно.",
+    "{1}: Что вы делаете?\n{2}: Мы экспериментируем.\n{3}: Это опасно.\n{2}: Мы знаем.\n{3}: Тогда почему вы улыбаетесь?\n{2}: Потому что это весело.\n{1}: Я вас оставлю.",
+
+    // === 4 персонажа ===
+    "{1}: У нас есть план?\n{2}: План — это слишком громко.\n{3}: Это скорее... направление.\n{4}: Мы идём в сторону катастрофы.\n{1}: Но осознанно.\n{4}: Да, с полным пониманием последствий.",
+
+    // === 5 персонажей ===
+    "{1}: Итак, у нас есть план.\n{2}: Нет, у нас есть идея.\n{3}: Нет, у нас есть надежда.\n{4}: Нет, у нас есть отчаяние.\n{5}: ...у нас вообще что-нибудь есть?\n{1}: У нас есть мы. И этого достаточно.\n{2}: Это не достаточное условие.\n{1}: Заткнись."
 ];
 
 // ---- ХРАНИЛИЩЕ ----
@@ -413,6 +450,24 @@ function generateQuote() {
     const all = getAllQuotes();
     if (all.length === 0) { alert('Цитаты не найдены!'); return; }
 
+    // Получаем выбранное количество персонажей
+    const selectedCount = parseInt(document.getElementById('charCount').value);
+
+    // Фильтруем цитаты: только те, где число участников = выбранному
+    const matchingQuotes = all.filter(q => countNamesNeeded(q) === selectedCount);
+
+    const noMsg = document.getElementById('noQuotesMsg');
+
+    if (matchingQuotes.length === 0) {
+        noMsg.classList.remove('hidden');
+        noMsg.textContent = `Нет цитат для ${selectedCount} персонажей. Попробуйте другое количество.`;
+        document.getElementById('copyBtn').classList.add('hidden');
+        return;
+    }
+
+    noMsg.classList.add('hidden');
+
+    // Собираем имена из полей
     const rows = document.querySelectorAll('.name-field-row');
     const names = Array.from(rows).map(row => {
         const nameInput = row.querySelector('.name-field-input');
@@ -423,16 +478,16 @@ function generateQuote() {
         };
     }).filter(n => n.name.length > 0);
 
-    if (names.length === 0) { alert('Введите хотя бы одно имя!'); return; }
+    if (names.length === 0) { alert('Введите имена!'); return; }
+    if (names.length < selectedCount) {
+        alert(`Нужно заполнить ${selectedCount} полей с именами, сейчас заполнено ${names.length}.`);
+        return;
+    }
 
-    // Подбираем цитату, которой хватает имён
-    let attempts = 0, template;
-    do {
-        template = all[Math.floor(Math.random() * all.length)];
-        attempts++;
-    } while (countNamesNeeded(template) > names.length && attempts < 50);
+    // Выбираем случайную цитату из отфильтрованных
+    const template = matchingQuotes[Math.floor(Math.random() * matchingQuotes.length)];
 
-    // ПЕРЕМЕШИВАЕМ имена — кто какой номер получит, теперь случайно
+    // Перемешиваем имена — кто какой номер получит, случайно
     const shuffledNames = shuffleArray(names);
 
     const filled = fillTemplate(template, shuffledNames);
@@ -475,6 +530,47 @@ function updatePlaceholders() {
     document.querySelectorAll('.name-field-input').forEach((inp, i) => {
         inp.placeholder = `Имя ${i + 1}`;
     });
+}
+
+// Создаёт ровно N полей, сохраняя уже введённые значения если возможно
+function updateNameFields() {
+    const count = parseInt(document.getElementById('charCount').value);
+    const container = document.getElementById('nameFields');
+
+    // Сохраняем текущие значения
+    const existingRows = Array.from(container.querySelectorAll('.name-field-row'));
+    const savedValues = existingRows.map(row => {
+        const input = row.querySelector('.name-field-input');
+        const select = row.querySelector('.gender-select');
+        return { name: input.value, gender: select ? select.value : 'm' };
+    });
+
+    // Очищаем
+    container.innerHTML = '';
+
+    // Создаём заново N полей, восстанавливая значения
+    for (let i = 0; i < count; i++) {
+        const saved = savedValues[i] || { name: '', gender: 'm' };
+        createNameField(saved.name, saved.gender);
+    }
+
+    // Прячем сообщение "нет цитат"
+    document.getElementById('noQuotesMsg').classList.add('hidden');
+}
+
+// Добавление лишнего поля (кнопкой "Добавить поле")
+function addExtraField() {
+    createNameField();
+    // При ручном добавлении обновляем селектор, чтобы он соответствовал числу полей
+    syncCharCountToFields();
+}
+
+// Синхронизация: если пользователь добавил больше полей, обновляем селектор
+function syncCharCountToFields() {
+    const fields = document.querySelectorAll('.name-field-row').length;
+    const select = document.getElementById('charCount');
+    // Если текущее значение меньше числа полей — не трогаем, селектор задаёт лимит
+    // Эта функция пока просто заглушка для будущей логики
 }
 
 // ---- КОПИРОВАНИЕ ----
@@ -560,13 +656,26 @@ function renderQuoteList() {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadQuotesFromServer();
-    createNameField(); createNameField(); createNameField();
+    // Создаём 2 поля (значение по умолчанию в селекторе)
+    updateNameFields();
+
     document.getElementById('namesInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') {
+            const count = parseInt(document.getElementById('charCount').value);
             const names = e.target.value.split(',').map(n => n.trim()).filter(n => n.length > 0);
             if (names.length > 0) {
+                // Если ввели больше имён, чем выбрано персонажей — обновляем селектор
+                if (names.length > count) {
+                    document.getElementById('charCount').value = Math.min(names.length, 5);
+                }
+                // Берём ровно столько имён, сколько выбрано персонажей
+                const needed = parseInt(document.getElementById('charCount').value);
+                const finalNames = names.slice(0, needed);
+                // Если ввели меньше, чем нужно — дополняем пустыми
+                while (finalNames.length < needed) finalNames.push('');
+
                 document.getElementById('nameFields').innerHTML = '';
-                names.forEach(n => createNameField(n, 'm'));
+                finalNames.forEach(n => createNameField(n, 'm'));
                 e.target.value = '';
             }
         }
